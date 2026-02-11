@@ -19,7 +19,7 @@ def create_post(post):
         INSERT into Posts (user_id, category, title, publication_date, image_url, content, approved) values (?,?,?,?,?,?,1)
                           """, (
                               post['user_id'],
-                              post['category'],
+                              post['category_id'],
                               post['title'],
                               datetime.now(),
                               post['image_url'],
