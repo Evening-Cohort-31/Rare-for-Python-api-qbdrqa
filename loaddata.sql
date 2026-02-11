@@ -91,3 +91,5 @@ INSERT INTO Reactions ('label', 'image_url') VALUES ('happy', 'https://pngtree.c
 
 
 ALTER TABLE "Users" ADD "type" varchar;
+
+DELETE FROM "Users";
