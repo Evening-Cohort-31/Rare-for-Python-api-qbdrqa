@@ -60,8 +60,8 @@ def create_user(user):
             user['email'],
             user['password'],
             user['bio'],
-            user['type'],
-            datetime.now()
+            datetime.now(),
+            user['type']
         ))
 
         id = db_cursor.lastrowid
