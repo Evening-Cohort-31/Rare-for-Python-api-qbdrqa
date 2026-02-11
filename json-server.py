@@ -3,8 +3,7 @@ from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
 # Add your imports below this line
-from views import user
-from views import create_user, login_user
+from views import create_user, login_user, create_post
 
 class JSONServer(HandleRequests):
     """Server class to handle incoming HTTP requests for shipping ships"""
@@ -102,6 +101,9 @@ class JSONServer(HandleRequests):
             response_body = login_user(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
+        elif url["requested_resource"] == "new_post":
+            response_body = create_post(request_body)
+            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
         else:
             return self.response(
                 "", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
