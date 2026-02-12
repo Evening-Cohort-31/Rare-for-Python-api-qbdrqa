@@ -46,3 +46,31 @@ def create_post(post):
         new_post = dict(db_cursor.fetchone())
 
         return json.dumps(new_post)
+
+
+def get_user_posts(user_id):
+    """Retrieves a users posts from the database
+    
+    Args: 
+        user_id (int): The id of the user
+    
+    Returns:
+        json string: A list of all the user's posts
+    """
+    with sqlite3.connect("./db.sqlite3") as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT * FROM Posts p
+            WHERE p.user_id = ?
+            """,
+            (
+                user_id,
+            ),
+        )
+
+        user_posts = db_cursor.fetchall()
+
+        return json.dumps(user_posts)    
