@@ -65,6 +65,7 @@ def get_user_posts(user_id):
             """
             SELECT * FROM Posts p
             WHERE p.user_id = ?
+            ORDERBY p.publication_date DESC
             """,
             (
                 user_id,
