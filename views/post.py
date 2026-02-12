@@ -50,10 +50,10 @@ def create_post(post):
 
 def get_user_posts(user_id):
     """Retrieves a users posts from the database
-    
-    Args: 
+
+    Args:
         user_id (int): The id of the user
-    
+
     Returns:
         json string: A list of all the user's posts
     """
@@ -63,15 +63,49 @@ def get_user_posts(user_id):
 
         db_cursor.execute(
             """
-            SELECT * FROM Posts p
+            SELECT 
+            p.id, 
+            p.user_id, 
+            p.category_id, 
+            p.title, 
+            p.publication_date, 
+            u.first_name,
+            u.last_name,
+            u.username, 
+            c.label
+            FROM Posts p
+            JOIN Users u
+            ON p.user_id = u.id
+            JOIN Categories c
+            ON p.category_id = c.id
             WHERE p.user_id = ?
             ORDER BY p.publication_date DESC
             """,
-            (
-                user_id,
-            ),
+            (user_id,),
         )
 
         user_posts = db_cursor.fetchall()
 
-        return json.dumps([dict(row) for row in user_posts])    
+        posts = []
+        for row in user_posts:
+            user = {
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "user_name": row["username"]
+            }
+
+            category = {
+                "label": row["label"]
+            }
+
+            post = {
+                "id": row["id"],
+                "user": user,
+                "category": category,
+                "title": row["title"],
+                "publication_date": row["publication_date"],
+            }
+
+            posts.append(post)
+
+        return json.dumps(posts)
