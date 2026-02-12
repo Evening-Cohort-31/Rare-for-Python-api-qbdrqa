@@ -73,4 +73,4 @@ def get_user_posts(user_id):
 
         user_posts = db_cursor.fetchall()
 
-        return json.dumps(user_posts)    
+        return json.dumps([dict(row) for row in user_posts])    
