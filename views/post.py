@@ -91,7 +91,7 @@ def get_user_posts(user_id):
             user = {
                 "first_name": row["first_name"],
                 "last_name": row["last_name"],
-                "user_name": row["username"]
+                "username": row["username"]
             }
 
             category = {
@@ -109,3 +109,59 @@ def get_user_posts(user_id):
             posts.append(post)
 
         return json.dumps(posts)
+
+def get_post_by_id(id):
+    with sqlite3.connect("./db.sqlite3") as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT
+            *
+            FROM Posts p
+            WHERE p.id = ?
+            """,
+            (id,),
+        )
+
+        post = db_cursor.fetchone()
+
+        return json.dumps(dict(post))
+
+def update_post(post):
+    with sqlite3.connect("./db.sqlite3") as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            UPDATE Posts
+            SET 
+            category_id = ?,
+            title = ?,
+            content = ?,
+            image_url = ?
+            WHERE id = ?
+            """,
+            (
+            post["category_id"],
+            post["title"],
+            post["content"],
+            post["image_url"],
+            post["id"],
+            )
+        )
+
+        db_cursor.execute(
+        """
+        SELECT *
+        FROM Posts
+        WHERE id = ?
+        """,
+        (post["id"],)
+        )
+
+        updated_post = dict(db_cursor.fetchone())
+
+        return json.dumps(updated_post)

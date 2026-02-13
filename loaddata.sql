@@ -93,3 +93,8 @@ INSERT INTO Reactions ('label', 'image_url') VALUES ('happy', 'https://pngtree.c
 ALTER TABLE "Users" ADD "type" varchar;
 
 DELETE FROM "Users";
+
+
+INSERT INTO Categories ('label') VALUES ('Work'), ('Hobby'), ('Fluff')
+
+UPDATE Categories SET 'label' = 'Life' WHERE id = 1
