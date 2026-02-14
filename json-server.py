@@ -3,7 +3,7 @@ from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
 # Add your imports below this line
-from views import create_user, login_user, create_post, get_user_posts, get_post_by_id, update_post
+from views import create_user, login_user, create_post, get_user_posts, get_post_by_id, update_post, get_all_posts
 
 class JSONServer(HandleRequests):
     """Server class to handle incoming HTTP requests for shipping ships"""
@@ -28,6 +28,9 @@ class JSONServer(HandleRequests):
         elif url["requested_resource"] == "posts":
             if url["pk"] !=0:
                 response_body = get_post_by_id(url['pk'])
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            if url["pk"] == 0:
+                response_body = get_all_posts()
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
             if "user_id" in query_params:
                 user_id = query_params["user_id"][0]
