@@ -34,7 +34,7 @@ def get_category_by_id(id):
         return json.dumps(dict(category))
 
 def create_category(category):
-    with sqlite3.connect("./db/sqlite3") as conn:
+    with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
