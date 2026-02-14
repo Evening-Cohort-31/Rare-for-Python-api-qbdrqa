@@ -88,3 +88,13 @@ CREATE TABLE "Categories" (
 INSERT INTO Categories ('label') VALUES ('News');
 INSERT INTO Tags ('label') VALUES ('JavaScript');
 INSERT INTO Reactions ('label', 'image_url') VALUES ('happy', 'https://pngtree.com/so/happy');
+
+
+ALTER TABLE "Users" ADD "type" varchar;
+
+DELETE FROM "Users";
+
+
+INSERT INTO Categories ('label') VALUES ('Work'), ('Hobby'), ('Fluff')
+
+UPDATE Categories SET 'label' = 'Life' WHERE id = 1

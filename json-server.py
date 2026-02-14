@@ -3,8 +3,7 @@ from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
 # Add your imports below this line
-from views import user
-from views import create_user, login_user
+from views import create_user, login_user, create_post, get_user_posts, get_post_by_id, update_post
 
 class JSONServer(HandleRequests):
     """Server class to handle incoming HTTP requests for shipping ships"""
@@ -14,6 +13,7 @@ class JSONServer(HandleRequests):
 
         response_body = ""
         url = self.parse_url(self.path)
+        query_params = url["query_params"]
 
         if url["requested_resource"] == "user":
             # Example workflow for get user by id
@@ -25,6 +25,14 @@ class JSONServer(HandleRequests):
             # return self.response(response_body, status.HTTP_200_SUCCESS.value)
             pass
 
+        elif url["requested_resource"] == "posts":
+            if url["pk"] !=0:
+                response_body = get_post_by_id(url['pk'])
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            if "user_id" in query_params:
+                user_id = query_params["user_id"][0]
+                response_body = get_user_posts(user_id)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
         else:
             return self.response(
                 "", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
@@ -42,14 +50,11 @@ class JSONServer(HandleRequests):
         request_body = self.rfile.read(content_len)
         request_body = json.loads(request_body)
 
-    # Example of updating user info
-    #     if url["requested_resource"] == "user":
-    #         if pk != 0:
-    #             successfully_updated = update_user(pk, request_body)
-    #             if successfully_updated:
-    #                 return self.response(
-    #                     "", status.HTTP_204_SUCCESS_NO_RESPONSE_BODY.value
-    #                 )
+        if url["requested_resource"] == "posts":
+            if pk !=0:
+                succesfully_updated = update_post(request_body)
+                if succesfully_updated:
+                    return  self.response(succesfully_updated, status.HTTP_200_SUCCESS.value)
 
         return self.response(
             "Requested resource not found",
@@ -102,6 +107,9 @@ class JSONServer(HandleRequests):
             response_body = login_user(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
+        elif url["requested_resource"] == "new_post":
+            response_body = create_post(request_body)
+            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
         else:
             return self.response(
                 "", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
