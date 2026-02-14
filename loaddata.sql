@@ -87,6 +87,15 @@ CREATE TABLE "Categories" (
 
 INSERT INTO Categories ('label') VALUES ('News');
 INSERT INTO Tags ('label') VALUES ('JavaScript');
+INSERT INTO Tags ('label') VALUES ('Python');
+INSERT INTO Tags ('label') VALUES ('React');
+INSERT INTO Tags ('label') VALUES ('Node.js');
+INSERT INTO Tags ('label') VALUES ('CSS');
+INSERT INTO Tags ('label') VALUES ('HTML');
+INSERT INTO Tags ('label') VALUES ('SQL');
+INSERT INTO Tags ('label') VALUES ('Web Development');
+INSERT INTO Tags ('label') VALUES ('Tutorial');
+INSERT INTO Tags ('label') VALUES ('Opinion');
 INSERT INTO Reactions ('label', 'image_url') VALUES ('happy', 'https://pngtree.com/so/happy');
 
 
