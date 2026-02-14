@@ -4,6 +4,7 @@ from nss_handler import HandleRequests, status
 
 # Add your imports below this line
 from views import create_user, login_user, create_post, get_user_posts, get_post_by_id, update_post, get_all_posts
+from views import get_tags, get_tag_by_id, create_tag
 
 class JSONServer(HandleRequests):
     """Server class to handle incoming HTTP requests for shipping ships"""
@@ -36,6 +37,12 @@ class JSONServer(HandleRequests):
                 user_id = query_params["user_id"][0]
                 response_body = get_user_posts(user_id)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
+        elif url["requested_resource"] == "tags":
+            if url["pk"] !=0:
+                response_body = get_tag_by_id(url["pk"])
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            response_body = get_tags()
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
         else:
             return self.response(
                 "", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
@@ -112,6 +119,10 @@ class JSONServer(HandleRequests):
 
         elif url["requested_resource"] == "new_post":
             response_body = create_post(request_body)
+            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
+        
+        elif url["requested_resource"] == "tags":
+            response_body = create_tag(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
         else:
             return self.response(
