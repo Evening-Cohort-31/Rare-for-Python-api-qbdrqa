@@ -32,8 +32,6 @@ def create_post(post):
 
         post_id = db_cursor.lastrowid
 
-        conn.row_factory = sqlite3.Row
-        db_cursor = conn.cursor()
         db_cursor.execute(
             """
         SELECT *
@@ -263,3 +261,4 @@ def approve_post(post_id):
         db_cursor = conn.cursor()
         db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
         return json.dumps(dict(db_cursor.fetchone()))
+    
