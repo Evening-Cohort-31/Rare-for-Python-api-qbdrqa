@@ -3,7 +3,7 @@ from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
 # Add your imports below this line
-from views import create_user, login_user, create_post, get_user_posts, get_post_by_id, update_post, get_all_posts
+from views import create_user, login_user, create_post, get_user_posts, get_post_by_id, update_post, get_all_posts, get_user
 
 class JSONServer(HandleRequests):
     """Server class to handle incoming HTTP requests for shipping ships"""
@@ -16,25 +16,23 @@ class JSONServer(HandleRequests):
         query_params = url["query_params"]
 
         if url["requested_resource"] == "user":
-            # Example workflow for get user by id
-            # if url["pk"] != 0:
-            #     response_body = retrieve_user(url["pk"])
-            #     return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            if url["pk"] != 0:
+                response_body = get_user(url["pk"])
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
             # response_body = list_users()
             # return self.response(response_body, status.HTTP_200_SUCCESS.value)
-            pass
 
         elif url["requested_resource"] == "posts":
             if url["pk"] !=0:
                 response_body = get_post_by_id(url['pk'])
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
-            if url["pk"] == 0:
-                response_body = get_all_posts()
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
             if "user_id" in query_params:
                 user_id = query_params["user_id"][0]
                 response_body = get_user_posts(user_id)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            else:
+                response_body = get_all_posts()
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
         else:
             return self.response(
