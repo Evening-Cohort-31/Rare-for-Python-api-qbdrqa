@@ -98,3 +98,10 @@ DELETE FROM "Users";
 INSERT INTO Categories ('label') VALUES ('Work'), ('Hobby'), ('Fluff')
 
 UPDATE Categories SET 'label' = 'Life' WHERE id = 1
+
+
+UPDATE Users SET 'type' = "Admin" WHERE id = 5
+
+UPDATE Posts SET 'approved' = 0 WHERE id = 8
+
+UPDATE POSTS set 'approved' = 0 WHERE id != 0

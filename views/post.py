@@ -203,3 +203,63 @@ def update_post(post):
         updated_post = dict(db_cursor.fetchone())
 
         return json.dumps(updated_post)
+
+def get_unapproved_posts():
+    with sqlite3.connect("./db.sqlite3") as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT *
+            FROM Posts p
+            JOIN Users u
+            ON p.user_id = u.id
+            JOIN Categories c
+            ON p.category_id = c.id
+            WHERE approved = 0
+            ORDER BY p.publication_date DESC
+            """
+        )
+
+        posts = db_cursor.fetchall()
+
+        unapproved_posts = []
+
+        for row in posts:
+            user = {
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "username" : row["username"]
+            }
+
+            category = {
+                "label": row["label"]
+            }
+
+            post = {
+                "id": row["id"],
+                "user": user,
+                "category": category,
+                "title": row["title"],
+                "publication_date" : row["publication_date"],
+                "image_url": row["image_url"],
+                "content": row["content"],
+                "approved": row["approved"]
+            }
+
+            unapproved_posts.append(post)
+
+        return json.dumps(unapproved_posts)
+    
+def approve_post(post_id):
+    with sqlite3.connect("./db.sqlite3") as conn:
+        db_cursor = conn.cursor()
+        db_cursor.execute(
+            "UPDATE POSTS SET approved = 1 WHERE id = ?",
+            (post_id,)
+        )
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+        db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
+        return json.dumps(dict(db_cursor.fetchone()))
