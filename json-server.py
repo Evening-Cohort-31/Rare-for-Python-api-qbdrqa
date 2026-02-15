@@ -30,13 +30,12 @@ class JSONServer(HandleRequests):
             if url["pk"] !=0:
                 response_body = get_post_by_id(url['pk'])
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
-            if url["pk"] == 0:
-                response_body = get_all_posts()
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
             if "user_id" in query_params:
                 user_id = query_params["user_id"][0]
                 response_body = get_user_posts(user_id)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            response_body = get_all_posts()
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
         elif url["requested_resource"] == "tags":
             if url["pk"] !=0:
                 response_body = get_tag_by_id(url["pk"])
@@ -117,7 +116,7 @@ class JSONServer(HandleRequests):
             response_body = login_user(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
-        elif url["requested_resource"] == "new_post":
+        elif url["requested_resource"] == "post":
             response_body = create_post(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
         
