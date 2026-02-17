@@ -70,3 +70,20 @@ def create_user(user):
             'token': id,
             'valid': True
         })
+    
+def get_user(userId):
+    with sqlite3.connect("./db.sqlite3") as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute("""
+        SELECT * FROM Users
+        WHERE id = ?
+        """, (
+            userId,
+        ),)
+
+        user = db_cursor.fetchone()
+
+        return json.dumps(dict(user))
+
