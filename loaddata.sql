@@ -104,9 +104,16 @@ ALTER TABLE "Users" ADD "type" varchar;
 DELETE FROM "Users";
 
 
-INSERT INTO Categories ('label') VALUES ('Work'), ('Hobby'), ('Fluff');
+INSERT INTO Categories (label) VALUES ('Work'), ('Hobby'), ('Fluff');;
 
-UPDATE Categories SET 'label' = 'Life' WHERE id = 1;
+UPDATE Categories SET 'label' = 'Life' WHERE id = 1
+
+
+UPDATE Users SET 'type' = "Admin" WHERE id = 5
+
+UPDATE Posts SET 'approved' = 0 WHERE id = 8
+
+UPDATE POSTS set 'approved' = 0 WHERE id != 0;
 
 -- Seed Users
 INSERT INTO Users ('first_name', 'last_name', 'email', 'bio', 'username', 'password', 'profile_image_url', 'created_on', 'active', 'type') 
