@@ -78,9 +78,6 @@ def list_users():
         json string: A list of all users
     """
     with sqlite3.connect('./db.sqlite3') as conn:
-    
-def get_user(userId):
-    with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -119,3 +116,18 @@ def get_user(userId):
             users.append(user)
 
         return json.dumps(users)
+    
+def get_user(userId):
+    with sqlite3.connect("./db.sqlite3") as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute("""
+        SELECT * FROM Users u
+        WHERE u.id = ?
+        """, (userId,),)
+
+        user = db_cursor.fetchone()
+
+        return json.dumps(dict(user))
+
