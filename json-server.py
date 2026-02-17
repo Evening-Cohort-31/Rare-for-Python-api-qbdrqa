@@ -12,6 +12,7 @@ from views import (
     update_post,
     get_all_posts,
     get_user,
+    list_users,
 )
 from views import get_unapproved_posts, approve_post
 from views import get_all_categories, create_category, get_category_by_id
@@ -27,13 +28,13 @@ class JSONServer(HandleRequests):
         url = self.parse_url(self.path)
         query_params = url["query_params"]
 
-        if url["requested_resource"] == "user":
+        if url["requested_resource"] == "users":
             if url["pk"] != 0:
                 response_body = get_user(url["pk"])
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
-
-            # response_body = list_users()
-            # return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            response_body = list_users()
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
+          
 
         elif url["requested_resource"] == "posts":
             if url["pk"] != 0:

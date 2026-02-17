@@ -70,6 +70,14 @@ def create_user(user):
             'token': id,
             'valid': True
         })
+
+def list_users():
+    """Returns a list of all users from the database
+
+    Returns:
+        json string: A list of all users
+    """
+    with sqlite3.connect('./db.sqlite3') as conn:
     
 def get_user(userId):
     with sqlite3.connect("./db.sqlite3") as conn:
@@ -77,13 +85,37 @@ def get_user(userId):
         db_cursor = conn.cursor()
 
         db_cursor.execute("""
-        SELECT * FROM Users
-        WHERE id = ?
-        """, (
-            userId,
-        ),)
+        select
+            u.id,
+            u.first_name,
+            u.last_name,
+            u.username,
+            u.email,
+            u.password,
+            u.bio,
+            u.created_on,
+            u.active,
+            u.type
+        from Users u
+        """)
 
-        user = db_cursor.fetchone()
+        users = []
+        dataset = db_cursor.fetchall()
 
-        return json.dumps(dict(user))
+        for row in dataset:
+            user = {
+                'id': row['id'],
+                'first_name': row['first_name'],
+                'last_name': row['last_name'],
+                'username': row['username'],
+                'email': row['email'],
+                'password': row['password'],
+                'bio': row['bio'],
+                'created_on': row['created_on'],
+                'active': row['active'],
+                'type': row['type'],
+                'is_staff': True if row['type'] == 'admin' else False
+            }
+            users.append(user)
 
+        return json.dumps(users)
