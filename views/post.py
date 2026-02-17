@@ -1,6 +1,10 @@
 import sqlite3
 import json
 from datetime import datetime
+from pathlib import Path
+
+
+DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
 
 def create_post(post):
@@ -12,20 +16,23 @@ def create_post(post):
     Returns:
         json string: The newly created post
     """
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
         db_cursor.execute(
             """
-        INSERT into Posts (user_id, category_id, title, publication_date, image_url, content, approved) values (?,?,?,?,?,?,1)
-                          """,
+            INSERT into Posts
+                (user_id, category_id, title, publication_date, image_url, content, approved)
+            VALUES
+                (?, ?, ?, ?, ?, ?, 1)
+            """,
             (
                 post["user_id"],
                 post["category_id"],
                 post["title"],
-                datetime.now(),
-                post["image_url"],
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                post.get("image_url", None),
                 post["content"],
             ),
         )
@@ -34,10 +41,10 @@ def create_post(post):
 
         db_cursor.execute(
             """
-        SELECT *
-        FROM Posts p
-        WHERE p.id = ?
-        """,
+            SELECT *
+            FROM Posts p
+            WHERE p.id = ?
+            """,
             (post_id,),
         )
 
@@ -47,7 +54,8 @@ def create_post(post):
 
 
 def get_all_posts():
-    with sqlite3.connect("./db.sqlite3") as conn:
+    """Reader feed: approved posts only, published in the past only, newest first"""
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -65,7 +73,7 @@ def get_all_posts():
             JOIN Categories c
                 ON c.id = p.category_id
             WHERE p.approved = 1
-            AND date(p.publication_date) <= date('now')
+              AND date(p.publication_date) <= date('now')
             ORDER BY date(p.publication_date) DESC
             """
         )
@@ -93,27 +101,25 @@ def get_user_posts(user_id):
     Returns:
         json string: A list of all the user's posts
     """
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
         db_cursor.execute(
             """
             SELECT 
-            p.id, 
-            p.user_id, 
-            p.category_id, 
-            p.title, 
-            p.publication_date, 
-            u.first_name,
-            u.last_name,
-            u.username, 
-            c.label
+                p.id, 
+                p.user_id, 
+                p.category_id, 
+                p.title, 
+                p.publication_date, 
+                u.first_name,
+                u.last_name,
+                u.username, 
+                c.label
             FROM Posts p
-            JOIN Users u
-            ON p.user_id = u.id
-            JOIN Categories c
-            ON p.category_id = c.id
+            JOIN Users u ON p.user_id = u.id
+            JOIN Categories c ON p.category_id = c.id
             WHERE p.user_id = ?
             ORDER BY p.publication_date DESC
             """,
@@ -146,14 +152,14 @@ def get_user_posts(user_id):
 
 
 def get_post_by_id(id):
-    with sqlite3.connect("./db.sqlite3") as conn:
+    """Existing function kept for backwards-compatibility (team may be using it)."""
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
         db_cursor.execute(
             """
-            SELECT
-            *
+            SELECT *
             FROM Posts p
             WHERE p.id = ?
             """,
@@ -162,11 +168,56 @@ def get_post_by_id(id):
 
         post = db_cursor.fetchone()
 
+        # If not found, return empty object (handler can optionally return 404)
+        if post is None:
+            return json.dumps({})
+
         return json.dumps(dict(post))
 
 
+def get_post_details(post_id):
+    """Reader detail: approved + published in the past, plus author display name."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT
+                p.id,
+                p.title,
+                p.image_url,
+                p.content,
+                p.publication_date,
+                u.first_name || ' ' || u.last_name AS author_display_name
+            FROM Posts p
+            JOIN Users u ON u.id = p.user_id
+            WHERE p.id = ?
+              AND p.approved = 1
+              AND date(p.publication_date) <= date('now')
+            """,
+            (post_id,),
+        )
+
+        row = db_cursor.fetchone()
+
+        if row is None:
+            return json.dumps({})
+
+        return json.dumps(
+            {
+                "id": row["id"],
+                "title": row["title"],
+                "image_url": row["image_url"],
+                "content": row["content"],
+                "publication_date": row["publication_date"],
+                "author_display_name": row["author_display_name"],
+            }
+        )
+
+
 def update_post(post):
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -174,10 +225,10 @@ def update_post(post):
             """
             UPDATE Posts
             SET 
-            category_id = ?,
-            title = ?,
-            content = ?,
-            image_url = ?
+                category_id = ?,
+                title = ?,
+                content = ?,
+                image_url = ?
             WHERE id = ?
             """,
             (
@@ -191,14 +242,17 @@ def update_post(post):
 
         db_cursor.execute(
             """
-        SELECT *
-        FROM Posts
-        WHERE id = ?
-        """,
+            SELECT *
+            FROM Posts
+            WHERE id = ?
+            """,
             (post["id"],),
         )
 
-        updated_post = dict(db_cursor.fetchone())
+        updated_post = db_cursor.fetchone()
+
+        if updated_post is None:
+            return json.dumps({})
 
         return json.dumps(updated_post)
 
