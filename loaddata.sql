@@ -267,4 +267,4 @@ GROUP BY p.id
 ORDER BY date(p.publication_date) DESC
 
 
-UPDATE Posts SET user_id = 5 WHERE id = 15
+UPDATE Posts SET approved = 0 WHERE user_id = 5

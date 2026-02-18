@@ -8,6 +8,7 @@ from views.post import (
     get_post_details,
     update_post,
     get_all_posts,
+    get_post_by_id
 )
 
 from views.user import (
@@ -45,7 +46,7 @@ class JSONServer(HandleRequests):
 
         elif url["requested_resource"] == "posts":
             if url["pk"] != 0:
-                response_body = get_post_details(url["pk"])
+                response_body = get_post_by_id(url["pk"])
                 # optional: if empty object returned, you could send 404 here
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
                         

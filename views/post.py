@@ -346,7 +346,7 @@ def update_post(post):
             WHERE id = ?
             """,
             (
-                post["category_id"],
+                post["category"]["id"],
                 post["title"],
                 post["content"],
                 post["image_url"],
@@ -354,23 +354,17 @@ def update_post(post):
             ),
         )
 
-        update_post_tags(post["id"], post["tags"], db_cursor)
-
-        db_cursor.execute(
-            """
-            SELECT *
-            FROM Posts
-            WHERE id = ?
-            """,
-            (post["id"],),
-        )
+        update_post_tags(post["id"], [tag["id"] for tag in post["tags"]], db_cursor)
 
         updated_post = db_cursor.fetchone()
 
+        db_cursor.close()
+
         if updated_post is None:
             return json.dumps({})
+        
+        return get_post_by_id(post["id"])
 
-        return json.dumps(updated_post)
 
 def get_unapproved_posts():
     with sqlite3.connect("./db.sqlite3") as conn:
