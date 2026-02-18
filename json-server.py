@@ -13,20 +13,11 @@ from views.post import (
 from views.user import (
     create_user,
     login_user,
+    get_user, 
+    list_users
 )
 
 # Add your imports below this line
-from views import (
-    create_user,
-    login_user,
-    create_post,
-    get_user_posts,
-    get_post_by_id,
-    update_post,
-    get_all_posts,
-    get_user,
-    list_users,
-)
 from views import get_unapproved_posts, approve_post
 from views import get_all_categories, create_category, get_category_by_id
 from views import get_tags, get_tag_by_id, create_tag
@@ -101,19 +92,16 @@ class JSONServer(HandleRequests):
 
         if url["requested_resource"] == "posts":
             if pk != 0:
-
-                succesfully_updated = update_post(request_body)
-                if succesfully_updated:
-                    return self.response(
-                        succesfully_updated, status.HTTP_200_SUCCESS.value
-                    )
-
                 if "approved" in request_body and len(request_body) == 1:
                     response_body = approve_post(pk)
-                else:
-                    response_body = update_post(request_body)
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
-
+                    return self.response(
+                        response_body, status.HTTP_200_SUCCESS.value
+                    )
+                successfully_updated = update_post(request_body)
+                if successfully_updated:
+                    return self.response(
+                        successfully_updated, status.HTTP_200_SUCCESS.value
+                    )
 
         return self.response(
             "Requested resource not found",
