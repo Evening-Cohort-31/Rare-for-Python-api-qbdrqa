@@ -72,10 +72,8 @@ def create_user(user):
 
         id = db_cursor.lastrowid
 
-        return json.dumps({
-            'token': id,
-            'valid': True
-        })
+        return json.dumps({"token": id, "valid": True})
+
 
 def list_users():
     """Returns a list of all users from the database
@@ -83,11 +81,12 @@ def list_users():
     Returns:
         json string: A list of all users
     """
-    with sqlite3.connect('./db.sqlite3') as conn:
+    with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
-        db_cursor.execute("""
+        db_cursor.execute(
+            """
         select
             u.id,
             u.first_name,
@@ -101,43 +100,49 @@ def list_users():
             u.type,
             u.profile_image_url
         from Users u
-        """)
+        """
+        )
 
         users = []
         dataset = db_cursor.fetchall()
 
         for row in dataset:
             user = {
-                'id': row['id'],
-                'first_name': row['first_name'],
-                'last_name': row['last_name'],
-                'username': row['username'],
-                'email': row['email'],
-                'password': row['password'],
-                'bio': row['bio'],
-                'created_on': row['created_on'],
-                'active': row['active'],
-                'type': row['type'],
-                'is_staff': True if row['type'] == 'admin' else False,
-                'profile_image_url': row['profile_image_url']
+                "id": row["id"],
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "username": row["username"],
+                "email": row["email"],
+                "password": row["password"],
+                "bio": row["bio"],
+                "created_on": row["created_on"],
+                "active": row["active"],
+                "type": row["type"],
+                "is_staff": True if row["type"] == "admin" else False,
+                "profile_image_url": row["profile_image_url"],
             }
             users.append(user)
 
         return json.dumps(users)
-    
+
+
 def get_user(userId):
     with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
-        db_cursor.execute("""
+        db_cursor.execute(
+            """
         SELECT * FROM Users u
         WHERE u.id = ?
-        """, (userId,),)
+        """,
+            (userId,),
+        )
 
         user = db_cursor.fetchone()
 
         return json.dumps(dict(user))
+
 
 def update_user(user):
     with sqlite3.connect(DB_PATH) as conn:
@@ -158,25 +163,27 @@ def update_user(user):
                 active = ?,
                 type = ?
             WHERE id = ?
-            """, (
-                user['first_name'],
-                user['last_name'],
-                user['email'],
-                user['bio'],
-                user['username'],
-                user['password'],
-                user['profile_image_url'],
-                user['active'],
-                user['type'],
-                user['id']
-                )
+            """,
+            (
+                user["first_name"],
+                user["last_name"],
+                user["email"],
+                user["bio"],
+                user["username"],
+                user["password"],
+                user["profile_image_url"],
+                user["active"],
+                user["type"],
+                user["id"],
+            ),
         )
 
         db_cursor.execute(
             """
             SELECT * FROM Users
             WHERE id = ?
-            """, (user["id"],)
+            """,
+            (user["id"],),
         )
 
         updated_user = db_cursor.fetchone()
