@@ -23,7 +23,7 @@ def login_user(user):
 
         db_cursor.execute(
             """
-            select id, username
+            select id, username, active
             from Users
             where username = ?
             and password = ?
@@ -33,7 +33,7 @@ def login_user(user):
 
         user_from_db = db_cursor.fetchone()
 
-        if user_from_db is not None:
+        if user_from_db is not None and user_from_db["active"]:
             response = {"valid": True, "token": user_from_db["id"]}
         else:
             response = {"valid": False}
@@ -73,7 +73,6 @@ def create_user(user):
         id = db_cursor.lastrowid
 
         return json.dumps({"token": id, "valid": True})
-
 
 def list_users():
     """Returns a list of all users from the database
@@ -124,7 +123,6 @@ def list_users():
             users.append(user)
 
         return json.dumps(users)
-
 
 def get_user(userId):
     with sqlite3.connect("./db.sqlite3") as conn:
