@@ -98,7 +98,8 @@ def list_users():
             u.bio,
             u.created_on,
             u.active,
-            u.type
+            u.type,
+            u.profile_image_url
         from Users u
         """)
 
@@ -117,7 +118,8 @@ def list_users():
                 'created_on': row['created_on'],
                 'active': row['active'],
                 'type': row['type'],
-                'is_staff': True if row['type'] == 'admin' else False
+                'is_staff': True if row['type'] == 'admin' else False,
+                'profile_image_url': row['profile_image_url']
             }
             users.append(user)
 
@@ -137,3 +139,46 @@ def get_user(userId):
 
         return json.dumps(dict(user))
 
+def update_user(user):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            UPDATE Users
+            SET
+                first_name = ?,
+                last_name = ?,
+                email = ?,
+                bio = ?,
+                username = ?,
+                password = ?,
+                profile_image_url = ?,
+                active = ?,
+                type = ?
+            WHERE id = ?
+            """, (
+                user['first_name'],
+                user['last_name'],
+                user['email'],
+                user['bio'],
+                user['username'],
+                user['password'],
+                user['profile_image_url'],
+                user['active'],
+                user['type'],
+                user['id']
+                )
+        )
+
+        db_cursor.execute(
+            """
+            SELECT * FROM Users
+            WHERE id = ?
+            """, (user["id"],)
+        )
+
+        updated_user = db_cursor.fetchone()
+
+        return json.dumps(dict(updated_user))

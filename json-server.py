@@ -13,6 +13,7 @@ from views.post import (
 from views.user import (
     create_user,
     login_user,
+    update_user
 )
 
 # Add your imports below this line
@@ -114,6 +115,12 @@ class JSONServer(HandleRequests):
                     response_body = update_post(request_body)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
+        elif url["requested_resource"] == "users":
+            if pk != 0:
+                response_body = update_user(request_body)
+                return self.response(
+                    response_body, status.HTTP_200_SUCCESS.value
+                )
 
         return self.response(
             "Requested resource not found",
