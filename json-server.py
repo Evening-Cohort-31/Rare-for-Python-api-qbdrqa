@@ -2,6 +2,7 @@ import json
 from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
+from views.comment import create_comment, get_comments_by_post_id
 from views.post import (
     create_post,
     get_user_posts,
@@ -9,11 +10,7 @@ from views.post import (
     update_post,
     get_all_posts,
 )
-
-from views.user import (
-    create_user,
-    login_user,
-)
+from views.user import create_user, login_user
 
 
 class JSONServer(HandleRequests):
@@ -31,7 +28,7 @@ class JSONServer(HandleRequests):
             )
 
         elif url["requested_resource"] == "posts":
-            # IMPORTANT: query param routes must be checked BEFORE pk==0 list route
+            # /posts?user_id=#
             if "user_id" in query_params:
                 user_id = query_params["user_id"][0]
                 response_body = get_user_posts(user_id)
@@ -40,12 +37,21 @@ class JSONServer(HandleRequests):
             # /posts/<id>
             if url["pk"] != 0:
                 response_body = get_post_details(url["pk"])
-                # optional: if empty object returned, you could send 404 here
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
             # /posts
             response_body = get_all_posts()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
+        elif url["requested_resource"] == "comments":
+            # /comments?post_id=#
+            if "post_id" in query_params:
+                post_id = query_params["post_id"][0]
+                response_body = get_comments_by_post_id(post_id)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
+            # If no post_id is provided, return empty list
+            return self.response("[]", status.HTTP_200_SUCCESS.value)
 
         else:
             return self.response(
@@ -83,14 +89,12 @@ class JSONServer(HandleRequests):
                 "{}", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
             )
 
-        else:
-            return self.response(
-                "Not found", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
-            )
+        return self.response(
+            "Not found", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
+        )
 
     def do_POST(self):
         """Handle POST requests from a client"""
-        response_body = ""
         url = self.parse_url(self.path)
 
         content_len = int(self.headers.get("content-length", 0))
@@ -105,19 +109,17 @@ class JSONServer(HandleRequests):
             response_body = login_user(request_body)
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
+        elif url["requested_resource"] == "comments":
+            response_body = create_comment(request_body)
+            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
+
         elif url["requested_resource"] in ("new_post", "posts"):
             response_body = create_post(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
-        else:
-            return self.response(
-                "", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
-            )
+        return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
 
-#
-# THE CODE BELOW THIS LINE IS NOT IMPORTANT FOR REACHING YOUR LEARNING OBJECTIVES
-#
 def main():
     host = ""
     port = 8000

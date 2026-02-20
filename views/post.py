@@ -255,3 +255,17 @@ def update_post(post):
             return json.dumps({})
 
         return json.dumps(dict(updated_post))
+
+
+def get_post_title(post_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+        db_cursor.execute(
+            """
+            SELECT id, title FROM Posts WHERE id = ?
+        """,
+            (post_id,),
+        )
+        row = db_cursor.fetchone()
+        return json.dumps(dict(row)) if row else json.dumps({})
