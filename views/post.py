@@ -194,7 +194,7 @@ def get_all_posts():
             WHERE p.approved = 1
               AND date(p.publication_date) <= date('now')
             ORDER BY date(p.publication_date) DESC
-        """
+            """
         )
 
         posts = [dict(row) for row in db_cursor.fetchall()]
@@ -365,7 +365,6 @@ def update_post(post):
         
         return get_post_by_id(post["id"])
 
-
 def get_unapproved_posts():
     with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
@@ -462,3 +461,38 @@ def update_post_tags(post_id, tag_ids, db_cursor=None):
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             _update_tags(cursor)
+
+def get_posts_by_tag_id(tag_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT
+                p.id, p.title, p.content, p.approved,
+                p.publication_date, p.image_url,
+                json_object(
+                    'id', u.id, 'first_name', u.first_name,
+                    'last_name', u.last_name, 'username', u.username
+                ) as user,
+                json_object('id', c.id, 'label', c.label) as category
+            FROM Posts p
+            JOIN Users u ON p.user_id = u.id
+            JOIN Categories c ON p.category_id = c.id
+            JOIN PostTags pt ON pt.post_id = p.id
+            WHERE p.approved = 1
+              AND date(p.publication_date) <= date('now')
+              AND pt.tag_id = ?
+            ORDER BY date(p.publication_date) DESC
+            """, (tag_id,)
+        )
+
+        posts = [dict(row) for row in db_cursor.fetchall()]
+        post_ids = [p["id"] for p in posts]
+
+        # Fetch and attach related data
+        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
+        posts = _attach_related_data(posts, tags, comments, reactions)
+
+        return json.dumps(posts)

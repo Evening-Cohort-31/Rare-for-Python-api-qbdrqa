@@ -5,10 +5,12 @@ from nss_handler import HandleRequests, status
 from views.post import (
     create_post,
     get_user_posts,
-    get_post_details,
     update_post,
     get_all_posts,
-    get_post_by_id
+    get_post_by_id,
+    get_posts_by_tag_id,
+    get_unapproved_posts,
+    approve_post
 )
 
 from views.user import (
@@ -19,7 +21,6 @@ from views.user import (
 )
 
 # Add your imports below this line
-from views import get_unapproved_posts, approve_post
 from views import get_all_categories, create_category, get_category_by_id
 from views import get_tags, get_tag_by_id, create_tag
 
@@ -60,6 +61,11 @@ class JSONServer(HandleRequests):
                 if not approved:
                     response_body = get_unapproved_posts()
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
+            if "tag_id" in query_params:
+                tag_id = query_params['tag_id'][0]
+                response_body = get_posts_by_tag_id(tag_id)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
             response_body = get_all_posts()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
         
