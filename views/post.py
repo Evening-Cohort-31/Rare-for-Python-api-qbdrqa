@@ -7,42 +7,30 @@ DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
 
 def _fetch_related_data_for_posts(db_cursor, post_ids):
-    """Helper function to fetch tags, comments, and reactions for given post IDs
-
-    Args:
-        db_cursor: SQLite cursor
-        post_ids: List of post IDs to fetch data for
-
-    Returns:
-        tuple: (tags_by_post, comments_by_post, reactions_by_post) dictionaries
-    """
     if not post_ids:
         return {}, {}, {}
 
     placeholders = ",".join("?" * len(post_ids))
 
-    # Fetch tags
     db_cursor.execute(
         f"""
         SELECT pt.post_id, t.id, t.label
         FROM PostTags pt
         JOIN Tags t ON pt.tag_id = t.id
         WHERE pt.post_id IN ({placeholders})
-    """,
+        """,
         post_ids,
     )
-
     tags_by_post = {}
     for row in db_cursor.fetchall():
         tags_by_post.setdefault(row["post_id"], []).append(
             {"id": row["id"], "label": row["label"]}
         )
 
-    # Fetch comments
     db_cursor.execute(
         f"""
         SELECT 
-            cm.post_id, cm.id, cm.content,
+            cm.post_id, cm.id, cm.subject, cm.content, cm.created_on,
             json_object(
                 'id', u.id, 'first_name', u.first_name,
                 'last_name', u.last_name, 'username', u.username
@@ -50,21 +38,21 @@ def _fetch_related_data_for_posts(db_cursor, post_ids):
         FROM Comments cm
         JOIN Users u ON cm.author_id = u.id
         WHERE cm.post_id IN ({placeholders})
-    """,
+        """,
         post_ids,
     )
-
     comments_by_post = {}
     for row in db_cursor.fetchall():
         comments_by_post.setdefault(row["post_id"], []).append(
             {
                 "id": row["id"],
+                "subject": row["subject"] or "",
                 "content": row["content"],
+                "created_on": row["created_on"],
                 "author": json.loads(row["author"]),
             }
         )
 
-    # Fetch reactions
     db_cursor.execute(
         f"""
         SELECT 
@@ -80,10 +68,9 @@ def _fetch_related_data_for_posts(db_cursor, post_ids):
         JOIN Users u ON pr.user_id = u.id
         JOIN Reactions r ON pr.reaction_id = r.id
         WHERE pr.post_id IN ({placeholders})
-    """,
+        """,
         post_ids,
     )
-
     reactions_by_post = {}
     for row in db_cursor.fetchall():
         reactions_by_post.setdefault(row["post_id"], []).append(
@@ -98,25 +85,12 @@ def _fetch_related_data_for_posts(db_cursor, post_ids):
 
 
 def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_post):
-    """Helper to attach related data to post objects
-
-    Args:
-        posts: List of post dictionaries
-        tags_by_post: Dictionary mapping post_id to tags
-        comments_by_post: Dictionary mapping post_id to comments
-        reactions_by_post: Dictionary mapping post_id to reactions
-
-    Returns:
-        list: Posts with related data attached
-    """
     for post in posts:
-        # Parse JSON fields
         if isinstance(post.get("user"), str):
             post["user"] = json.loads(post["user"])
         if isinstance(post.get("category"), str):
             post["category"] = json.loads(post["category"])
 
-        # Attach related arrays
         post["tags"] = tags_by_post.get(post["id"], [])
         post["comments"] = comments_by_post.get(post["id"], [])
         post["reactions"] = reactions_by_post.get(post["id"], [])
@@ -124,15 +98,32 @@ def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_pos
     return posts
 
 
+def update_post_tags(post_id, tag_ids, db_cursor=None):
+    def _update_tags(cursor):
+        cursor.execute(
+            """
+            DELETE FROM PostTags WHERE post_id = ?
+            """,
+            (post_id,),
+        )
+
+        if tag_ids:
+            cursor.executemany(
+                """
+                INSERT INTO PostTags (post_id, tag_id)
+                VALUES (?, ?)
+                """,
+                [(post_id, tag_id) for tag_id in tag_ids],
+            )
+
+    if db_cursor:
+        _update_tags(db_cursor)
+    else:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            _update_tags(cursor)
+
 def create_post(post):
-    """Adds post to the database
-
-    Args:
-        post (dict): Contains the content and metadata of the post being created
-
-    Returns:
-        json string: The newly created post
-    """
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -149,14 +140,18 @@ def create_post(post):
                 post["category_id"],
                 post["title"],
                 datetime.now(),
-                post["image_url"],
+                post.get("image_url", ""),
                 post["content"],
             ),
         )
 
         post_id = db_cursor.lastrowid
 
-        update_post_tags(post_id, post["tags"], db_cursor)
+        if "tags" in post:
+            tag_ids = post["tags"]
+            if tag_ids and isinstance(tag_ids[0], dict):
+                tag_ids = [t["id"] for t in tag_ids]
+            update_post_tags(post_id, tag_ids, db_cursor)
 
         db_cursor.execute(
             """
@@ -168,17 +163,11 @@ def create_post(post):
         )
 
         new_post = dict(db_cursor.fetchone())
-
         return json.dumps(new_post)
 
 
 def get_all_posts():
-    """Get all approved posts with full related data
-
-    Returns:
-        json string: List of all approved posts with tags, comments, and reactions
-    """
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -204,7 +193,6 @@ def get_all_posts():
         posts = [dict(row) for row in db_cursor.fetchall()]
         post_ids = [p["id"] for p in posts]
 
-        # Fetch and attach related data
         tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
         posts = _attach_related_data(posts, tags, comments, reactions)
 
@@ -212,15 +200,7 @@ def get_all_posts():
 
 
 def get_user_posts(user_id):
-    """Retrieves a user's posts from the database with full related data
-
-    Args:
-        user_id (int): The id of the user
-
-    Returns:
-        json string: A list of all the user's posts with tags, comments, and reactions
-    """
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -239,14 +219,13 @@ def get_user_posts(user_id):
             JOIN Categories c ON p.category_id = c.id
             WHERE p.user_id = ?
             ORDER BY date(p.publication_date) DESC
-        """,
+            """,
             (user_id,),
         )
 
         posts = [dict(row) for row in db_cursor.fetchall()]
         post_ids = [p["id"] for p in posts]
 
-        # Fetch and attach related data
         tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
         posts = _attach_related_data(posts, tags, comments, reactions)
 
@@ -254,15 +233,7 @@ def get_user_posts(user_id):
 
 
 def get_post_by_id(post_id):
-    """Get a single post with full related data
-
-    Args:
-        post_id (int): The id of the post
-
-    Returns:
-        json string: The post with tags, comments, and reactions, or None if not found
-    """
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -280,7 +251,7 @@ def get_post_by_id(post_id):
             JOIN Users u ON p.user_id = u.id
             JOIN Categories c ON p.category_id = c.id
             WHERE p.id = ?
-        """,
+            """,
             (post_id,),
         )
 
@@ -289,8 +260,6 @@ def get_post_by_id(post_id):
             return json.dumps(None)
 
         posts = [dict(row)]
-
-        # Fetch and attach related data
         tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, [post_id])
         posts = _attach_related_data(posts, tags, comments, reactions)
 
@@ -298,8 +267,7 @@ def get_post_by_id(post_id):
 
 
 def get_post_details(post_id):
-    """Reader detail: approved + published in the past, plus author display name."""
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -322,7 +290,6 @@ def get_post_details(post_id):
         )
 
         row = db_cursor.fetchone()
-
         if row is None:
             return json.dumps({})
 
@@ -339,9 +306,13 @@ def get_post_details(post_id):
 
 
 def update_post(post):
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
+
+        category_id = post.get("category_id")
+        if category_id is None and isinstance(post.get("category"), dict):
+            category_id = post["category"].get("id")
 
         db_cursor.execute(
             """
@@ -354,121 +325,91 @@ def update_post(post):
             WHERE id = ?
             """,
             (
-                post["category"]["id"],
+                category_id,
                 post["title"],
                 post["content"],
-                post["image_url"],
+                post.get("image_url", ""),
                 post["id"],
             ),
         )
 
-        update_post_tags(post["id"], [tag["id"] for tag in post["tags"]], db_cursor)
-
-        updated_post = db_cursor.fetchone()
-
-        db_cursor.close()
-
-        if updated_post is None:
-            return json.dumps({})
+        if "tags" in post:
+            tag_ids = post["tags"]
+            if tag_ids and isinstance(tag_ids[0], dict):
+                tag_ids = [t["id"] for t in tag_ids]
+            update_post_tags(post["id"], tag_ids, db_cursor)
 
         return get_post_by_id(post["id"])
 
 
+def get_post_title(post_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+        db_cursor.execute(
+            """
+            SELECT id, title FROM Posts WHERE id = ?
+            """,
+            (post_id,),
+        )
+        row = db_cursor.fetchone()
+        return json.dumps(dict(row)) if row else json.dumps({})
+
+
 def get_unapproved_posts():
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
         db_cursor.execute(
             """
-            SELECT *
+            SELECT
+                p.id, p.title, p.content, p.approved,
+                p.publication_date, p.image_url,
+                u.first_name, u.last_name, u.username,
+                c.id as category_id, c.label as category_label
             FROM Posts p
-            JOIN Users u
-            ON p.user_id = u.id
-            JOIN Categories c
-            ON p.category_id = c.id
-            WHERE approved = 0
+            JOIN Users u ON p.user_id = u.id
+            JOIN Categories c ON p.category_id = c.id
+            WHERE p.approved = 0
             ORDER BY p.publication_date DESC
             """
         )
 
-        posts = db_cursor.fetchall()
+        posts = []
+        for row in db_cursor.fetchall():
+            posts.append(
+                {
+                    "id": row["id"],
+                    "user": {
+                        "first_name": row["first_name"],
+                        "last_name": row["last_name"],
+                        "username": row["username"],
+                    },
+                    "category": {
+                        "id": row["category_id"],
+                        "label": row["category_label"],
+                    },
+                    "title": row["title"],
+                    "publication_date": row["publication_date"],
+                    "image_url": row["image_url"],
+                    "content": row["content"],
+                    "approved": row["approved"],
+                }
+            )
 
-        unapproved_posts = []
-
-        for row in posts:
-            user = {
-                "first_name": row["first_name"],
-                "last_name": row["last_name"],
-                "username": row["username"],
-            }
-
-            category = {"label": row["label"]}
-
-            post = {
-                "id": row["id"],
-                "user": user,
-                "category": category,
-                "title": row["title"],
-                "publication_date": row["publication_date"],
-                "image_url": row["image_url"],
-                "content": row["content"],
-                "approved": row["approved"],
-            }
-
-            unapproved_posts.append(post)
-
-        return json.dumps(unapproved_posts)
+        return json.dumps(posts)
 
 
 def approve_post(post_id):
-    with sqlite3.connect("./db.sqlite3") as conn:
-        db_cursor = conn.cursor()
-        db_cursor.execute("UPDATE POSTS SET approved = 1 WHERE id = ?", (post_id,))
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
+        db_cursor.execute("UPDATE POSTS SET approved = 1 WHERE id = ?", (post_id,))
+
         db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
         return json.dumps(dict(db_cursor.fetchone()))
-
-
-def update_post_tags(post_id, tag_ids, db_cursor=None):
-    """
-    Replaces existing post_tags or creates new ones
-
-    :param post_id: Id of the post
-    :param tag_ids: Array of tag ids
-    :param db_cursor: Optional cursor to use existing connection
-    """
-
-    def _update_tags(cursor):
-        cursor.execute(
-            """
-        DELETE FROM PostTags WHERE post_id = ?
-        """,
-            (post_id,),
-        )
-
-        if tag_ids:
-            cursor.executemany(
-                """
-                INSERT INTO PostTags
-                (post_id, tag_id)
-                VALUES (?, ?)
-                """,
-                [(post_id, tag_id) for tag_id in tag_ids],
-            )
-
-    if db_cursor:
-        # Use provided cursor (within existing transaction)
-        _update_tags(db_cursor)
-    else:
-        # Create own connection
-        with sqlite3.connect("./db.sqlite3") as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            _update_tags(cursor)
-
-
+    
 def get_posts_by_tag_id(tag_id):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row

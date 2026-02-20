@@ -9,6 +9,7 @@ def get_all_categories():
         db_cursor.execute(
             """
             SELECT * FROM Categories
+            ORDER BY label
             """,
         )
 
