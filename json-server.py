@@ -10,7 +10,8 @@ from views.post import (
     get_post_by_id,
     get_posts_by_tag_id,
     get_unapproved_posts,
-    approve_post
+    approve_post,
+    search_posts_by_title
 )
 
 from views.user import (
@@ -66,6 +67,12 @@ class JSONServer(HandleRequests):
                 tag_id = query_params['tag_id'][0]
                 response_body = get_posts_by_tag_id(tag_id)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            
+            if "title" in query_params:
+                search_term = query_params['title'][0]
+                response_body = search_posts_by_title(search_term)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            
             response_body = get_all_posts()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
         
