@@ -265,3 +265,6 @@ WHERE p.approved = 1
 AND date(p.publication_date) <= date('now')
 GROUP BY p.id
 ORDER BY date(p.publication_date) DESC
+
+
+UPDATE Posts SET approved = 0 WHERE user_id = 5

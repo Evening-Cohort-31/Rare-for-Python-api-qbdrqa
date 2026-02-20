@@ -8,26 +8,18 @@ from views.post import (
     get_post_details,
     update_post,
     get_all_posts,
+    get_post_by_id
 )
 
 from views.user import (
     create_user,
     login_user,
-    update_user
+    update_user,
+    get_user, 
+    list_users
 )
 
 # Add your imports below this line
-from views import (
-    create_user,
-    login_user,
-    create_post,
-    get_user_posts,
-    get_post_by_id,
-    update_post,
-    get_all_posts,
-    get_user,
-    list_users,
-)
 from views import get_unapproved_posts, approve_post
 from views import get_all_categories, create_category, get_category_by_id
 from views import get_tags, get_tag_by_id, create_tag
@@ -55,7 +47,7 @@ class JSONServer(HandleRequests):
 
         elif url["requested_resource"] == "posts":
             if url["pk"] != 0:
-                response_body = get_post_details(url["pk"])
+                response_body = get_post_by_id(url["pk"])
                 # optional: if empty object returned, you could send 404 here
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
                         
@@ -102,13 +94,6 @@ class JSONServer(HandleRequests):
 
         if url["requested_resource"] == "posts":
             if pk != 0:
-
-                succesfully_updated = update_post(request_body)
-                if succesfully_updated:
-                    return self.response(
-                        succesfully_updated, status.HTTP_200_SUCCESS.value
-                    )
-
                 if "approved" in request_body and len(request_body) == 1:
                     response_body = approve_post(pk)
                 else:
