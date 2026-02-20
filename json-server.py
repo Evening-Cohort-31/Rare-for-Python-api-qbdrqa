@@ -105,6 +105,11 @@ class JSONServer(HandleRequests):
             successfully_updated = update_post(request_body)
             return self.response(successfully_updated, status.HTTP_200_SUCCESS.value)
 
+        if url["requested_resource"] == "users":
+            if pk != 0:
+                response_body = update_user(request_body)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
         return self.response(
             "Requested resource not found",
             status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value,
