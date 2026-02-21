@@ -83,7 +83,6 @@ def _fetch_related_data_for_posts(db_cursor, post_ids):
 
     return tags_by_post, comments_by_post, reactions_by_post
 
-
 def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_post):
     for post in posts:
         if isinstance(post.get("user"), str):
@@ -96,7 +95,6 @@ def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_pos
         post["reactions"] = reactions_by_post.get(post["id"], [])
 
     return posts
-
 
 def update_post_tags(post_id, tag_ids, db_cursor=None):
     def _update_tags(cursor):
@@ -218,6 +216,7 @@ def get_user_posts(user_id):
             JOIN Users u ON p.user_id = u.id
             JOIN Categories c ON p.category_id = c.id
             WHERE p.user_id = ?
+            AND p.approved = 1
             ORDER BY date(p.publication_date) DESC
             """,
             (user_id,),

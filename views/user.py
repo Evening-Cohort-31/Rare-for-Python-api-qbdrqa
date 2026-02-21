@@ -2,6 +2,9 @@ import sqlite3
 import json
 from datetime import datetime
 from pathlib import Path
+from itertools import chain
+
+from .post import get_user_posts
 
 
 DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
@@ -74,6 +77,7 @@ def create_user(user):
 
         return json.dumps({"token": id, "valid": True})
 
+
 def list_users():
     """Returns a list of all users from the database
 
@@ -123,6 +127,7 @@ def list_users():
             users.append(user)
 
         return json.dumps(users)
+
 
 def get_user(userId):
     with sqlite3.connect("./db.sqlite3") as conn:
@@ -187,3 +192,56 @@ def update_user(user):
         updated_user = db_cursor.fetchone()
 
         return json.dumps(dict(updated_user))
+
+
+def get_user_home_page(userId):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT 
+                u.id, 
+                u.first_name, 
+                u.last_name, 
+                u.email, 
+                u.bio, 
+                u.username, 
+                u.profile_image_url, 
+                u.created_on, 
+                u.type,
+                json_group_array(
+                    json_object(
+                        'id', su.id,
+                        'username', su.username,
+                        'created_on', su.created_on
+                    )
+                ) AS subscriptions
+            FROM Users u
+            LEFT JOIN Subscriptions s
+            ON s.follower_id = u.id
+            LEFT JOIN Users su
+            ON s.author_id = su.id 
+            WHERE u.id = ?
+            GROUP BY u.id
+            """,
+            (userId,),
+        )
+
+        row = db_cursor.fetchone()
+
+        user = dict(row)
+
+        # Parse the JSON string from SQLite to avoid double encoding
+        user["subscriptions"] = json.loads(user["subscriptions"])
+
+        subscribed_posts = [get_user_posts(int(s["id"])) for s in user["subscriptions"]]
+
+        user['posts'] = json.loads(get_user_posts(userId))
+        # Flatten the list of arrays into a single array
+        user["subscribed_posts"] = list(
+            chain.from_iterable([json.loads(post) for post in subscribed_posts])
+        )
+
+        return json.dumps(user)

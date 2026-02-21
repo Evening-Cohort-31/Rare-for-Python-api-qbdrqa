@@ -275,3 +275,7 @@ ADD COLUMN subject VARCHAR
 
 ALTER TABLE Comments
 ADD COLUMN created_on date
+
+
+UPDATE Subscriptions SET author_id = 6
+WHERE id = 3
