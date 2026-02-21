@@ -268,3 +268,10 @@ ORDER BY date(p.publication_date) DESC
 
 
 UPDATE Posts SET approved = 0 WHERE user_id = 5
+
+
+ALTER TABLE Comments
+ADD COLUMN subject VARCHAR
+
+ALTER TABLE Comments
+ADD COLUMN created_on date

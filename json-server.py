@@ -3,21 +3,14 @@ from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
 from views.comment import create_comment, get_comments_by_post_id
-from views.post import (
-    create_post,
-    get_user_posts,
-    get_post_details,
-    update_post,
-    get_all_posts,
-    get_post_by_id,
-    get_unapproved_posts,
-    approve_post,
-)
+from views.post import create_post, get_user_posts, update_post, get_all_posts, get_post_by_id, get_posts_by_tag_id, get_unapproved_posts, approve_post, search_posts_by_title
+
 from views.user import (
     create_user,
     login_user,
-    get_user,
-    list_users,
+    update_user,
+    get_user, 
+    list_users
 )
 from views.category import get_all_categories, create_category, get_category_by_id
 from views.tag import get_tags, get_tag_by_id, create_tag
@@ -59,6 +52,16 @@ class JSONServer(HandleRequests):
                     response_body = get_unapproved_posts()
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
+            if "tag_id" in query_params:
+                tag_id = query_params['tag_id'][0]
+                response_body = get_posts_by_tag_id(tag_id)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            
+            if "title" in query_params:
+                search_term = query_params['title'][0]
+                response_body = search_posts_by_title(search_term)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            
             response_body = get_all_posts()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
@@ -101,6 +104,11 @@ class JSONServer(HandleRequests):
 
             successfully_updated = update_post(request_body)
             return self.response(successfully_updated, status.HTTP_200_SUCCESS.value)
+
+        if url["requested_resource"] == "users":
+            if pk != 0:
+                response_body = update_user(request_body)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
         return self.response(
             "Requested resource not found",
