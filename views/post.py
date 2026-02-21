@@ -482,3 +482,11 @@ def search_posts_by_title(search_term):
         posts = _attach_related_data(posts, tags, comments, reactions)
 
         return json.dumps(posts)
+    
+def delete_post(post_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        db_cursor = conn.cursor()
+        db_cursor.execute("DELETE FROM PostTags WHERE post_id = ?", (post_id,))
+        db_cursor.execute("DELETE FROM Comments WHERE post_id = ?", (post_id,))
+        db_cursor.execute("DELETE FROM Posts WHERE id = ?", (post_id,))
+        return json.dumps({"deleted": True})
