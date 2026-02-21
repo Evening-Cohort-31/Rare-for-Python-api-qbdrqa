@@ -3,7 +3,7 @@ from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
 from views.comment import create_comment, get_comments_by_post_id
-from views.post import create_post, get_user_posts, update_post, get_all_posts, get_post_by_id, get_posts_by_tag_id, get_unapproved_posts, approve_post, search_posts_by_title
+from views.post import create_post, get_user_posts, update_post, get_all_posts, get_post_by_id, get_posts_by_tag_id, get_unapproved_posts, approve_post, search_posts_by_title, delete_post
 
 from views.user import (
     create_user,
@@ -117,6 +117,12 @@ class JSONServer(HandleRequests):
 
     def do_DELETE(self):
         """Handle DELETE requests from a client"""
+        url = self.parse_url(self.path)
+
+        if url["requested_resource"] == "posts" and url["pk"] != 0:
+            response_body = delete_post(url["pk"])
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
         return self.response(
             "Not found", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
         )
