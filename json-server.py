@@ -3,7 +3,7 @@ from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
 from views.comment import create_comment, get_comments_by_post_id
-from views.post import create_post, get_user_posts, update_post, get_all_posts, get_post_by_id, get_posts_by_tag_id, get_unapproved_posts, approve_post, search_posts_by_title, delete_post
+from views.post import create_post, get_user_posts, update_post, get_all_posts, get_post_by_id, get_posts_by_tag_id, get_unapproved_posts, approve_post, search_posts_by_title, delete_post, get_subscribed_posts
 
 from views.user import (
     create_user,
@@ -44,6 +44,9 @@ class JSONServer(HandleRequests):
             
         if url["requested_resource"] == "posts":
             if url["pk"] != 0:
+                if "subscriptions" in query_params and query_params["subscriptions"][0].lower() == "true":
+                    response_body = get_subscribed_posts(url["pk"])
+                    return self.response(response_body, status.HTTP_200_SUCCESS.value)
                 response_body = get_post_by_id(url["pk"])
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 

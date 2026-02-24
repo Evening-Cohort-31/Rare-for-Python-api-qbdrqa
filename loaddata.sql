@@ -279,3 +279,15 @@ ADD COLUMN created_on date
 
 UPDATE Subscriptions SET author_id = 6
 WHERE id = 3
+
+
+INSERT INTO Subscriptions
+("follower_id", "author_id", "created_on")
+VALUES (5, 7, "2025-02-23")
+
+
+
+
+  SELECT s.author_id FROM
+  Subscriptions s
+  WHERE s.follower_id = 5

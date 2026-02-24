@@ -83,6 +83,7 @@ def _fetch_related_data_for_posts(db_cursor, post_ids):
 
     return tags_by_post, comments_by_post, reactions_by_post
 
+
 def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_post):
     for post in posts:
         if isinstance(post.get("user"), str):
@@ -95,6 +96,7 @@ def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_pos
         post["reactions"] = reactions_by_post.get(post["id"], [])
 
     return posts
+
 
 def update_post_tags(post_id, tag_ids, db_cursor=None):
     def _update_tags(cursor):
@@ -120,6 +122,7 @@ def update_post_tags(post_id, tag_ids, db_cursor=None):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             _update_tags(cursor)
+
 
 def create_post(post):
     with sqlite3.connect(DB_PATH) as conn:
@@ -408,7 +411,8 @@ def approve_post(post_id):
 
         db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
         return json.dumps(dict(db_cursor.fetchone()))
-    
+
+
 def get_posts_by_tag_id(tag_id):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -481,7 +485,8 @@ def search_posts_by_title(search_term):
         posts = _attach_related_data(posts, tags, comments, reactions)
 
         return json.dumps(posts)
-    
+
+
 def delete_post(post_id):
     with sqlite3.connect(DB_PATH) as conn:
         db_cursor = conn.cursor()
@@ -489,3 +494,53 @@ def delete_post(post_id):
         db_cursor.execute("DELETE FROM Comments WHERE post_id = ?", (post_id,))
         db_cursor.execute("DELETE FROM Posts WHERE id = ?", (post_id,))
         return json.dumps({"deleted": True})
+
+
+def get_subscribed_posts(user_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT s.author_id FROM
+            Subscriptions s
+            WHERE s.follower_id = ?
+            """,
+            (user_id,),
+        )
+
+        subscribed_users = [row["author_id"] for row in db_cursor.fetchall()]
+
+        if not subscribed_users:
+            return json.dumps([])
+
+        placeholders = ",".join("?" * len(subscribed_users))
+
+        db_cursor.execute(
+            f"""
+            SELECT
+                p.id, p.title, p.content, p.approved,
+                p.publication_date, p.image_url,
+                json_object(
+                    'id', u.id, 'first_name', u.first_name,
+                    'last_name', u.last_name, 'username', u.username
+                ) as user,
+                json_object('id', c.id, 'label', c.label) as category
+            FROM Posts p
+            JOIN Users u ON p.user_id = u.id
+            JOIN Categories c ON p.category_id = c.id
+            WHERE p.user_id IN ({placeholders})
+            AND p.approved = 1
+            ORDER BY date(p.publication_date) DESC
+            """,
+            subscribed_users,
+        )
+
+        posts = [dict(row) for row in db_cursor.fetchall()]
+        post_ids = [p["id"] for p in posts]
+
+        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
+        posts = _attach_related_data(posts, tags, comments, reactions)
+
+        return json.dumps(posts)
