@@ -130,7 +130,7 @@ def list_users():
 
 
 def get_user(user_id):
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -140,14 +140,12 @@ def get_user(user_id):
             u.*,
             COUNT(s.follower_id) AS subscriber_count
         FROM Users u
-        JOIN Subscriptions s
-        ON s.author_id = ?
+        LEFT JOIN Subscriptions s
+        ON s.author_id = u.id
         WHERE u.id = ?
+        GROUP BY u.id
         """,
-            (
-                user_id,
-                user_id,
-            ),
+            (user_id,),
         )
 
         user = dict(db_cursor.fetchone())
