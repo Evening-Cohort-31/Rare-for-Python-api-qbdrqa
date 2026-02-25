@@ -2,10 +2,6 @@ import sqlite3
 import json
 from datetime import datetime
 from pathlib import Path
-from itertools import chain
-
-from .post import get_user_posts
-
 
 DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
