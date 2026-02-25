@@ -3,14 +3,16 @@ from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
 from views.comment import create_comment, get_comments_by_post_id
-from views.post import create_post, get_user_posts, update_post, get_all_posts, get_post_by_id, get_posts_by_tag_id, get_unapproved_posts, approve_post, search_posts_by_title, delete_post
+from views.post import create_post, get_user_posts, update_post, get_all_posts, get_post_by_id, get_posts_by_tag_id, get_unapproved_posts, approve_post, search_posts_by_title, delete_post, get_subscribed_posts
 
 from views.user import (
     create_user,
     login_user,
     update_user,
     get_user, 
-    list_users
+    list_users,
+    add_subscription,
+    delete_subscription
 )
 from views.category import get_all_categories, create_category, get_category_by_id
 from views.tag import get_tags, get_tag_by_id, create_tag
@@ -35,9 +37,12 @@ class JSONServer(HandleRequests):
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
             response_body = list_users()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
-
+            
         if url["requested_resource"] == "posts":
             if url["pk"] != 0:
+                if "subscriptions" in query_params and query_params["subscriptions"][0].lower() == "true":
+                    response_body = get_subscribed_posts(url["pk"])
+                    return self.response(response_body, status.HTTP_200_SUCCESS.value)
                 response_body = get_post_by_id(url["pk"])
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
@@ -118,11 +123,17 @@ class JSONServer(HandleRequests):
     def do_DELETE(self):
         """Handle DELETE requests from a client"""
         url = self.parse_url(self.path)
+        query_params = url["query_params"]
 
         if url["requested_resource"] == "posts" and url["pk"] != 0:
             response_body = delete_post(url["pk"])
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
+        if url["requested_resource"] == "users":
+            if url["pk"] != 0:
+                if "sub_id" in query_params:
+                    response_body = delete_subscription(url["pk"], query_params["sub_id"][0])
+                    return self.response(response_body, status.HTTP_200_SUCCESS.value)
         return self.response(
             "Not found", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
         )
@@ -130,10 +141,12 @@ class JSONServer(HandleRequests):
     def do_POST(self):
         """Handle POST requests from a client"""
         url = self.parse_url(self.path)
+        query_params = url["query_params"] 
 
         content_len = int(self.headers.get("content-length", 0))
         request_body = self.rfile.read(content_len)
-        request_body = json.loads(request_body)
+        if (request_body):
+            request_body = json.loads(request_body)
 
         if url["requested_resource"] == "register":
             response_body = create_user(request_body)
@@ -159,6 +172,12 @@ class JSONServer(HandleRequests):
             response_body = create_tag(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
+        if url["requested_resource"] == "users":
+            if url["pk"] != 0:
+                if 'sub_id' in query_params:
+                    response_body = add_subscription(url["pk"], query_params["sub_id"][0])
+                    return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
+                
         return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
 

@@ -2,6 +2,9 @@ import sqlite3
 import json
 from datetime import datetime
 from pathlib import Path
+from itertools import chain
+
+from .post import get_user_posts
 
 
 DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
@@ -74,6 +77,7 @@ def create_user(user):
 
         return json.dumps({"token": id, "valid": True})
 
+
 def list_users():
     """Returns a list of all users from the database
 
@@ -124,22 +128,37 @@ def list_users():
 
         return json.dumps(users)
 
-def get_user(userId):
+
+def get_user(user_id):
     with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
         db_cursor.execute(
             """
-        SELECT * FROM Users u
+        SELECT 
+            u.*,
+            COUNT(s.follower_id) AS subscriber_count
+        FROM Users u
+        JOIN Subscriptions s
+        ON s.author_id = ?
         WHERE u.id = ?
         """,
-            (userId,),
+            (
+                user_id,
+                user_id,
+            ),
         )
 
-        user = db_cursor.fetchone()
+        user = dict(db_cursor.fetchone())
 
-        return json.dumps(dict(user))
+        user["subscriptions"] = json.loads(
+            __get_subscriptions__(user_id, db_cursor)["subscriptions"]
+        )
+        user["subscribers"] = json.loads(
+            __get_subscribers__(user_id, db_cursor)["subscribers"]
+        )
+        return json.dumps(user)
 
 
 def update_user(user):
@@ -187,3 +206,124 @@ def update_user(user):
         updated_user = db_cursor.fetchone()
 
         return json.dumps(dict(updated_user))
+
+
+def __get_subscriptions__(user_id, db_cursor=None):
+    execution = """
+            SELECT
+                json_group_array(json_object('id', u.id, 'username', u.username)) as subscriptions
+            FROM Subscriptions s
+            JOIN Users u
+            ON s.author_id = u.id
+            WHERE s.follower_id = ?
+        """
+    if db_cursor:
+        db_cursor.execute(execution, (user_id,))
+
+    else:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            db_cursor = conn.cursor()
+
+            db_cursor.execute(
+                execution,
+                (user_id,),
+            )
+
+    subscriptions = dict(db_cursor.fetchone())
+
+    return subscriptions
+
+
+def __get_subscribers__(user_id, db_cursor=None):
+    execution = """
+        SELECT
+            json_group_array(json_object('id', u.id, 'username', u.username)) as subscribers
+        FROM Subscriptions s
+        JOIN Users u
+        ON s.follower_id = u.id
+        WHERE s.author_id = ?
+    """
+
+    if db_cursor:
+        db_cursor.execute(execution, (user_id,))
+
+    else:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            db_cursor = conn.cursor()
+
+            db_cursor.execute(
+                execution,
+                (user_id,),
+            )
+
+    subscribers = dict(db_cursor.fetchone())
+
+    return subscribers
+
+
+def add_subscription(user_id, sub_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        # Check if subscription already exists
+        db_cursor.execute(
+            """
+            SELECT s.id FROM Subscriptions s
+            WHERE s.author_id = ?
+            AND s.follower_id = ?
+            """,
+            (sub_id, user_id),
+        )
+
+        existing = db_cursor.fetchone()
+
+        if existing:
+            # Return existing subscription
+            subscription_id = existing["id"]
+        else:
+            # Create new subscription
+            db_cursor.execute(
+                """
+                INSERT INTO Subscriptions (follower_id, author_id, created_on)
+                VALUES (?, ?, ?)    
+                """,
+                (user_id, sub_id, datetime.now()),
+            )
+            subscription_id = db_cursor.lastrowid
+
+        db_cursor.execute(
+            """
+            SELECT u.id, u.username FROM Subscriptions s
+            JOIN Users u
+            ON u.id = s.follower_id
+            WHERE s.id = ?
+            """,
+            (subscription_id,),
+        )
+
+        subscription = db_cursor.fetchone()
+
+        return json.dumps(dict(subscription))
+
+
+def delete_subscription(user_id, sub_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            DELETE FROM Subscriptions
+            WHERE follower_id = ?
+            AND author_id = ?
+            """,
+            (
+                user_id,
+                sub_id,
+            ),
+        )
+
+        return json.dumps({"deleted": "true"})

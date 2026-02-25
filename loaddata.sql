@@ -188,14 +188,14 @@ VALUES
 -- Seed Subscriptions
 INSERT INTO Subscriptions ('follower_id', 'author_id', 'created_on') 
 VALUES 
-(2, 1, '2024-02-02'),
-(4, 1, '2024-02-03'),
-(5, 1, '2024-02-04'),
-(1, 2, '2024-02-06'),
-(4, 2, '2024-02-07'),
-(1, 4, '2024-02-11'),
-(2, 4, '2024-02-12'),
-(1, 5, '2024-02-13');
+(5, 7, '2024-02-02'),
+(6, 5, '2024-02-03'),
+(7, 5, '2024-02-04'),
+(8, 5, '2024-02-06'),
+(9, 10, '2024-02-07'),
+(10, 11, '2024-02-11'),
+(11, 6, '2024-02-12'),
+(5, 6, '2024-02-13');
 
 -- Seed DemotionQueue
 INSERT INTO DemotionQueue ('action', 'admin_id', 'approver_one_id') 
@@ -275,3 +275,30 @@ ADD COLUMN subject VARCHAR
 
 ALTER TABLE Comments
 ADD COLUMN created_on date
+
+
+UPDATE Subscriptions SET author_id = 6
+WHERE id = 3
+
+
+INSERT INTO Subscriptions
+("follower_id", "author_id", "created_on")
+VALUES (5, 7, "2025-02-23")
+
+
+
+
+  SELECT s.author_id FROM
+  Subscriptions s
+  WHERE s.follower_id = 5
+
+
+  UPDATE Subscriptions SET follower_id = 5
+  WHERE follower_id < 5
+
+
+  UPDATE Subscriptions SET follower_id = 6
+  WHERE follower_id = 5 AND author_id = 5
+
+  DELETE FROM Subscriptions
+  WHERE id IS NOT NULL
