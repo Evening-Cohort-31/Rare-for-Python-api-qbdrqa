@@ -11,7 +11,6 @@ from views.user import (
     update_user,
     get_user, 
     list_users,
-    get_user_home_page
 )
 from views.category import get_all_categories, create_category, get_category_by_id
 from views.tag import get_tags, get_tag_by_id, create_tag
@@ -36,11 +35,6 @@ class JSONServer(HandleRequests):
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
             response_body = list_users()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
-
-        if url["requested_resource"] == "home_page":
-            if url["pk"] != 0:
-                response_body = get_user_home_page(url["pk"])
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
             
         if url["requested_resource"] == "posts":
             if url["pk"] != 0:

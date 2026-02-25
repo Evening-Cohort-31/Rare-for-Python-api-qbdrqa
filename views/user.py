@@ -136,15 +136,22 @@ def get_user(userId):
 
         db_cursor.execute(
             """
-        SELECT * FROM Users u
+        SELECT 
+            u.*,
+            COUNT(s.follower_id) AS subscriber_count
+        FROM Users u
+        JOIN Subscriptions s
+        ON s.author_id = ?
         WHERE u.id = ?
         """,
-            (userId,),
+            (userId, userId,),
         )
 
-        user = db_cursor.fetchone()
+        user = dict(db_cursor.fetchone())
 
-        return json.dumps(dict(user))
+        user["subscriptions"] = json.loads(__get_subscribers__(userId, db_cursor)["subscriptions"])
+
+        return json.dumps(user)
 
 
 def update_user(user):
@@ -193,55 +200,38 @@ def update_user(user):
 
         return json.dumps(dict(updated_user))
 
+def __get_subscribers__(user_id, db_cursor=None):
+    execution = """
+            SELECT
+                json_group_array(json_object('id', u.id, 'username', u.username)) as subscriptions
+            FROM Subscriptions s
+            JOIN Users u
+            ON s.author_id = u.id
+            WHERE s.follower_id = ?
+        """
+    if db_cursor:
+        db_cursor.execute(execution, (user_id,))
 
-def get_user_home_page(userId):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        db_cursor = conn.cursor()
+    else:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            db_cursor = conn.cursor()
 
-        db_cursor.execute(
-            """
-            SELECT 
-                u.id, 
-                u.first_name, 
-                u.last_name, 
-                u.email, 
-                u.bio, 
-                u.username, 
-                u.profile_image_url, 
-                u.created_on, 
-                u.type,
-                json_group_array(
-                    json_object(
-                        'id', su.id,
-                        'username', su.username,
-                        'created_on', su.created_on
-                    )
-                ) AS subscriptions
-            FROM Users u
-            LEFT JOIN Subscriptions s
-            ON s.follower_id = u.id
-            LEFT JOIN Users su
-            ON s.author_id = su.id 
-            WHERE u.id = ?
-            GROUP BY u.id
-            """,
-            (userId,),
-        )
+            db_cursor.execute(
+                """
+                SELECT
+                    json_object('id', u.id, 'username', u.username) as subscriptions
+                FROM Subscriptions s
+                JOIN Users u
+                ON s.author_id = u.id
+                WHERE s.follower_id = ?
+                """,
+                (user_id,),
+            )
 
-        row = db_cursor.fetchone()
+    subscriptions = dict(db_cursor.fetchone())
 
-        user = dict(row)
+    return subscriptions
 
-        # Parse the JSON string from SQLite to avoid double encoding
-        user["subscriptions"] = json.loads(user["subscriptions"])
 
-        subscribed_posts = [get_user_posts(int(s["id"])) for s in user["subscriptions"]]
 
-        user['posts'] = json.loads(get_user_posts(userId))
-        # Flatten the list of arrays into a single array
-        user["subscribed_posts"] = list(
-            chain.from_iterable([json.loads(post) for post in subscribed_posts])
-        )
-
-        return json.dumps(user)
