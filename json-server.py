@@ -11,6 +11,8 @@ from views.user import (
     update_user,
     get_user, 
     list_users,
+    add_subscription,
+    delete_subscription
 )
 from views.category import get_all_categories, create_category, get_category_by_id
 from views.tag import get_tags, get_tag_by_id, create_tag
@@ -121,11 +123,17 @@ class JSONServer(HandleRequests):
     def do_DELETE(self):
         """Handle DELETE requests from a client"""
         url = self.parse_url(self.path)
+        query_params = url["query_params"]
 
         if url["requested_resource"] == "posts" and url["pk"] != 0:
             response_body = delete_post(url["pk"])
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
+        if url["requested_resource"] == "users":
+            if url["pk"] != 0:
+                if "sub_id" in query_params:
+                    response_body = delete_subscription(url["pk"], query_params["sub_id"][0])
+                    return self.response(response_body, status.HTTP_200_SUCCESS.value)
         return self.response(
             "Not found", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
         )
@@ -133,10 +141,12 @@ class JSONServer(HandleRequests):
     def do_POST(self):
         """Handle POST requests from a client"""
         url = self.parse_url(self.path)
+        query_params = url["query_params"] 
 
         content_len = int(self.headers.get("content-length", 0))
         request_body = self.rfile.read(content_len)
-        request_body = json.loads(request_body)
+        if (request_body):
+            request_body = json.loads(request_body)
 
         if url["requested_resource"] == "register":
             response_body = create_user(request_body)
@@ -162,6 +172,12 @@ class JSONServer(HandleRequests):
             response_body = create_tag(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
+        if url["requested_resource"] == "users":
+            if url["pk"] != 0:
+                if 'sub_id' in query_params:
+                    response_body = add_subscription(url["pk"], query_params["sub_id"][0])
+                    return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
+                
         return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
 
