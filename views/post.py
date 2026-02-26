@@ -134,7 +134,7 @@ def create_post(post):
             INSERT into Posts
                 (user_id, category_id, title, publication_date, image_url, content, approved)
             VALUES
-                (?, ?, ?, ?, ?, ?, 1)
+                (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 post["user_id"],
@@ -143,6 +143,7 @@ def create_post(post):
                 datetime.now(),
                 post.get("image_url", ""),
                 post["content"],
+                post["approved"],
             ),
         )
 
@@ -187,6 +188,7 @@ def get_all_posts():
             JOIN Categories c ON p.category_id = c.id
             WHERE p.approved = 1
               AND date(p.publication_date) <= date('now')
+              AND u.active = 1
             ORDER BY date(p.publication_date) DESC
             """
         )
@@ -368,37 +370,26 @@ def get_unapproved_posts():
             SELECT
                 p.id, p.title, p.content, p.approved,
                 p.publication_date, p.image_url,
-                u.first_name, u.last_name, u.username,
-                c.id as category_id, c.label as category_label
+                json_object(
+                    'id', u.id, 'first_name', u.first_name,
+                    'last_name', u.last_name, 'username', u.username
+                ) as user,
+                json_object('id', c.id, 'label', c.label) as category
             FROM Posts p
             JOIN Users u ON p.user_id = u.id
             JOIN Categories c ON p.category_id = c.id
             WHERE p.approved = 0
-            ORDER BY p.publication_date DESC
+              AND u.active = 1
+            ORDER BY date(p.publication_date) DESC
             """
         )
 
-        posts = []
-        for row in db_cursor.fetchall():
-            posts.append(
-                {
-                    "id": row["id"],
-                    "user": {
-                        "first_name": row["first_name"],
-                        "last_name": row["last_name"],
-                        "username": row["username"],
-                    },
-                    "category": {
-                        "id": row["category_id"],
-                        "label": row["category_label"],
-                    },
-                    "title": row["title"],
-                    "publication_date": row["publication_date"],
-                    "image_url": row["image_url"],
-                    "content": row["content"],
-                    "approved": row["approved"],
-                }
-            )
+
+        posts = [dict(row) for row in db_cursor.fetchall()]
+        post_ids = [p["id"] for p in posts]
+
+        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
+        posts = _attach_related_data(posts, tags, comments, reactions)
 
         return json.dumps(posts)
 
