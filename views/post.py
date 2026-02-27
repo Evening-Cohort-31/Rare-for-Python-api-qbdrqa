@@ -449,7 +449,13 @@ def approve_post(post_id):
         )
 
         db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
-        return json.dumps(dict(db_cursor.fetchone()))
+
+        approved_post = dict(db_cursor.fetchone())
+        
+        if "image" in approved_post:
+            del approved_post["image"]
+
+        return json.dumps(approved_post)
 
 
 def get_posts_by_tag_id(tag_id):
