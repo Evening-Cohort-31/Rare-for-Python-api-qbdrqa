@@ -17,7 +17,7 @@ from views.post import (
     search_posts_by_title,
     delete_post,
     get_subscribed_posts,
-    get_post_header_image
+    get_post_header_image,
 )
 
 from views.user import (
@@ -72,11 +72,10 @@ class JSONServer(HandleRequests):
                     except (BrokenPipeError, ConnectionResetError):
                         pass
                 else:
+                    # Send 404 with no body to avoid ORB blocking
                     self.send_response(404)
-                    self.send_header("Content-Type", "application/json")
                     self.send_header("Access-Control-Allow-Origin", "*")
                     self.end_headers()
-                    self.wfile.write(b'{"error": "Image not found"}')
                 return
             response_body = list_users()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
@@ -134,13 +133,12 @@ class JSONServer(HandleRequests):
                     except (BrokenPipeError, ConnectionResetError):
                         pass
                 else:
+                    # Send 404 with no body to avoid ORB blocking
                     self.send_response(404)
-                    self.send_header("Content-Type", "application/json")
                     self.send_header("Access-Control-Allow-Origin", "*")
                     self.end_headers()
-                    self.wfile.write(b'{"error": "Image not found"}')
                 return
-            
+
             response_body = get_all_posts()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
