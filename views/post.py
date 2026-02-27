@@ -142,9 +142,9 @@ def create_post(post):
         db_cursor.execute(
             """
             INSERT into Posts
-                (user_id, category_id, title, publication_date, image, content, approved)
+                (user_id, category_id, title, publication_date, image, content, approved, updated_at)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?)
+                (?, ?, ?, ?, ?, ?, ?,?)
             """,
             (
                 post["user_id"],
@@ -154,6 +154,7 @@ def create_post(post):
                 blob_data,
                 post["content"],
                 post["approved"],
+                datetime.now(),
             ),
         )
 
@@ -179,7 +180,7 @@ def get_all_posts():
             """
             SELECT
                 p.id, p.title, p.content, p.approved,
-                p.publication_date,
+                p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
                     'last_name', u.last_name, 'username', u.username
@@ -213,7 +214,7 @@ def get_user_posts(user_id):
             """
             SELECT
                 p.id, p.title, p.content, p.approved,
-                p.publication_date,
+                p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
                     'last_name', u.last_name, 'username', u.username
@@ -242,7 +243,7 @@ def get_post_by_id(post_id, cursor=None):
     execution = """
     SELECT
         p.id, p.title, p.content, p.approved,
-        p.publication_date,
+        p.publication_date, p.updated_at,
         json_object(
             'id', u.id, 'first_name', u.first_name,
             'last_name', u.last_name, 'username', u.username
@@ -253,7 +254,7 @@ def get_post_by_id(post_id, cursor=None):
     JOIN Categories c ON p.category_id = c.id
     WHERE p.id = ?
     """
-    
+
     if cursor is not None:
         db_cursor = cursor
         db_cursor.execute(execution, (post_id,))
@@ -290,6 +291,7 @@ def get_post_details(post_id):
                 p.title,
                 p.content,
                 p.publication_date,
+                p.updated_at,
                 u.first_name || ' ' || u.last_name AS author_display_name
             FROM Posts p
             JOIN Users u ON u.id = p.user_id
@@ -324,32 +326,59 @@ def update_post(post):
         if category_id is None and isinstance(post.get("category"), dict):
             category_id = post["category"].get("id")
 
+        # Check if a new image is being provided
+        has_new_image = "image" in post and post["image"]
         blob_data = None
-        if "image" in post and post["image"]:
+
+        if has_new_image:
             if isinstance(post["image"], bytes):
                 blob_data = post["image"]
             else:
                 with open(post["image"], "rb") as file:
                     blob_data = file.read()
 
-        db_cursor.execute(
-            """
-            UPDATE Posts
-            SET 
-                category_id = ?,
-                title = ?,
-                content = ?,
-                image = ?
-            WHERE id = ?
-            """,
-            (
-                category_id,
-                post["title"],
-                post["content"],
-                blob_data,
-                post["id"],
-            ),
-        )
+        # Build UPDATE query conditionally based on whether image is provided
+        if has_new_image:
+            db_cursor.execute(
+                """
+                UPDATE Posts
+                SET 
+                    category_id = ?,
+                    title = ?,
+                    content = ?,
+                    image = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    category_id,
+                    post["title"],
+                    post["content"],
+                    blob_data,
+                    datetime.now(),
+                    post["id"],
+                ),
+            )
+        else:
+            # Don't update image field if no new image provided
+            db_cursor.execute(
+                """
+                UPDATE Posts
+                SET 
+                    category_id = ?,
+                    title = ?,
+                    content = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    category_id,
+                    post["title"],
+                    post["content"],
+                    datetime.now(),
+                    post["id"],
+                ),
+            )
 
         if "tags" in post:
             tag_ids = post["tags"]
@@ -383,7 +412,7 @@ def get_unapproved_posts():
             """
             SELECT
                 p.id, p.title, p.content, p.approved,
-                p.publication_date,
+                p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
                     'last_name', u.last_name, 'username', u.username
@@ -398,7 +427,6 @@ def get_unapproved_posts():
             """
         )
 
-
         posts = [dict(row) for row in db_cursor.fetchall()]
         post_ids = [p["id"] for p in posts]
 
@@ -412,7 +440,13 @@ def approve_post(post_id):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
-        db_cursor.execute("UPDATE POSTS SET approved = 1 WHERE id = ?", (post_id,))
+        db_cursor.execute(
+            "UPDATE POSTS SET approved = 1, updated_at = ? WHERE id = ?",
+            (
+                datetime.now(),
+                post_id,
+            ),
+        )
 
         db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
         return json.dumps(dict(db_cursor.fetchone()))
@@ -427,7 +461,7 @@ def get_posts_by_tag_id(tag_id):
             """
             SELECT
                 p.id, p.title, p.content, p.approved,
-                p.publication_date,
+                p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
                     'last_name', u.last_name, 'username', u.username
@@ -464,7 +498,7 @@ def search_posts_by_title(search_term):
             """
             SELECT
             p.id, p.title, p.content, p.approved,
-            p.publication_date,
+            p.publication_date, p.updated_at,
             json_object(
                 'id', u.id, 'first_name', u.first_name,
                 'last_name', u.last_name, 'username', u.username
@@ -526,7 +560,7 @@ def get_subscribed_posts(user_id):
             f"""
             SELECT
                 p.id, p.title, p.content, p.approved,
-                p.publication_date,
+                p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
                     'last_name', u.last_name, 'username', u.username
@@ -555,9 +589,6 @@ def get_post_header_image(post_id):
     """Returns only the profile image blob"""
     with sqlite3.connect(DB_PATH) as conn:
         db_cursor = conn.cursor()
-        db_cursor.execute(
-            "SELECT image FROM Posts WHERE id = ?",
-            (post_id,)
-        )
+        db_cursor.execute("SELECT image FROM Posts WHERE id = ?", (post_id,))
         result = db_cursor.fetchone()
         return result[0] if result and result[0] else None

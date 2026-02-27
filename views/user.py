@@ -65,7 +65,7 @@ def create_user(user):
 
         db_cursor.execute(
             """
-        Insert into Users (first_name, last_name, username, email, password, bio, profile_image, created_on, active, type) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        Insert into Users (first_name, last_name, username, email, password, bio, profile_image, created_on, active, type, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         """,
             (
                 user["first_name"],
@@ -77,6 +77,7 @@ def create_user(user):
                 blob_data,
                 datetime.now(),
                 user["type"],
+                datetime.now(),
             ),
         )
 
@@ -158,6 +159,9 @@ def get_user(user_id):
         if "profile_image" in user:
             del user["profile_image"]
 
+        if "updated_at" in user:
+            user["image_version"] = user["updated_at"]
+
         user["subscriptions"] = json.loads(
             __get_subscriptions__(user_id, db_cursor)["subscriptions"]
         )
@@ -183,7 +187,8 @@ def update_user(user):
                 username = ?,
                 password = ?,
                 active = ?,
-                type = ?
+                type = ?,
+                updated_at = ?,
             WHERE id = ?
             """,
             (
@@ -195,6 +200,7 @@ def update_user(user):
                 user["password"],
                 user["active"],
                 user["type"],
+                datetime.now(),
                 user["id"],
             ),
         )
