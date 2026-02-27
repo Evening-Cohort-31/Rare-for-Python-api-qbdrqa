@@ -176,34 +176,73 @@ def update_user(user):
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
-        db_cursor.execute(
-            """
-            UPDATE Users
-            SET
-                first_name = ?,
-                last_name = ?,
-                email = ?,
-                bio = ?,
-                username = ?,
-                password = ?,
-                active = ?,
-                type = ?,
-                updated_at = ?,
-            WHERE id = ?
-            """,
-            (
-                user["first_name"],
-                user["last_name"],
-                user["email"],
-                user["bio"],
-                user["username"],
-                user["password"],
-                user["active"],
-                user["type"],
-                datetime.now(),
-                user["id"],
-            ),
-        )
+        has_new_image = "profile_image" in user and user["profile_image"]
+        blob_data = None
+
+        if has_new_image:
+            if isinstance(user["profile_image"], bytes):
+                blob_data = user["profile_image"]
+
+        if has_new_image:
+            db_cursor.execute(
+                """
+                UPDATE Users
+                SET
+                    first_name = ?,
+                    last_name = ?,
+                    email = ?,
+                    bio = ?,
+                    username = ?,
+                    password = ?,
+                    active = ?,
+                    type = ?,
+                    profile_image = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    user["first_name"],
+                    user["last_name"],
+                    user["email"],
+                    user["bio"],
+                    user["username"],
+                    user["password"],
+                    user["active"],
+                    user["type"],
+                    blob_data,
+                    datetime.now(),
+                    user["id"],
+                ),
+            )
+        else:
+            db_cursor.execute(
+                """
+                UPDATE Users
+                SET
+                    first_name = ?,
+                    last_name = ?,
+                    email = ?,
+                    bio = ?,
+                    username = ?,
+                    password = ?,
+                    active = ?,
+                    type = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    user["first_name"],
+                    user["last_name"],
+                    user["email"],
+                    user["bio"],
+                    user["username"],
+                    user["password"],
+                    user["active"],
+                    user["type"],
+                    datetime.now(),
+                    user["id"],
+                ),
+            )
 
         db_cursor.execute(
             """
@@ -348,10 +387,6 @@ def get_user_profile_image(user_id):
     """Returns only the profile image blob"""
     with sqlite3.connect(DB_PATH) as conn:
         db_cursor = conn.cursor()
-        db_cursor.execute(
-            "SELECT profile_image FROM Users WHERE id = ?",
-            (user_id,)
-        )
+        db_cursor.execute("SELECT profile_image FROM Users WHERE id = ?", (user_id,))
         result = db_cursor.fetchone()
         return result[0] if result and result[0] else None
-    
