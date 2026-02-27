@@ -172,93 +172,96 @@ def get_user(user_id):
 
 
 def update_user(user):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        db_cursor = conn.cursor()
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            db_cursor = conn.cursor()
 
-        has_new_image = "profile_image" in user and user["profile_image"]
-        blob_data = None
+            has_new_image = "profile_image" in user and user["profile_image"]
+            blob_data = None
 
-        if has_new_image:
-            if isinstance(user["profile_image"], bytes):
-                blob_data = user["profile_image"]
+            if has_new_image:
+                if isinstance(user["profile_image"], bytes):
+                    blob_data = user["profile_image"]
 
-        if has_new_image:
+            if has_new_image:
+                db_cursor.execute(
+                    """
+                    UPDATE Users
+                    SET
+                        first_name = ?,
+                        last_name = ?,
+                        email = ?,
+                        bio = ?,
+                        username = ?,
+                        password = ?,
+                        active = ?,
+                        type = ?,
+                        profile_image = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        user["first_name"],
+                        user["last_name"],
+                        user["email"],
+                        user["bio"],
+                        user["username"],
+                        user["password"],
+                        user["active"],
+                        user["type"],
+                        blob_data,
+                        datetime.now(),
+                        user["id"],
+                    ),
+                )
+            else:
+                db_cursor.execute(
+                    """
+                    UPDATE Users
+                    SET
+                        first_name = ?,
+                        last_name = ?,
+                        email = ?,
+                        bio = ?,
+                        username = ?,
+                        password = ?,
+                        active = ?,
+                        type = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        user["first_name"],
+                        user["last_name"],
+                        user["email"],
+                        user["bio"],
+                        user["username"],
+                        user["password"],
+                        user["active"],
+                        user["type"],
+                        datetime.now(),
+                        user["id"],
+                    ),
+                )
+
             db_cursor.execute(
                 """
-                UPDATE Users
-                SET
-                    first_name = ?,
-                    last_name = ?,
-                    email = ?,
-                    bio = ?,
-                    username = ?,
-                    password = ?,
-                    active = ?,
-                    type = ?,
-                    profile_image = ?,
-                    updated_at = ?
+                SELECT * FROM Users
                 WHERE id = ?
                 """,
-                (
-                    user["first_name"],
-                    user["last_name"],
-                    user["email"],
-                    user["bio"],
-                    user["username"],
-                    user["password"],
-                    user["active"],
-                    user["type"],
-                    blob_data,
-                    datetime.now(),
-                    user["id"],
-                ),
-            )
-        else:
-            db_cursor.execute(
-                """
-                UPDATE Users
-                SET
-                    first_name = ?,
-                    last_name = ?,
-                    email = ?,
-                    bio = ?,
-                    username = ?,
-                    password = ?,
-                    active = ?,
-                    type = ?,
-                    updated_at = ?
-                WHERE id = ?
-                """,
-                (
-                    user["first_name"],
-                    user["last_name"],
-                    user["email"],
-                    user["bio"],
-                    user["username"],
-                    user["password"],
-                    user["active"],
-                    user["type"],
-                    datetime.now(),
-                    user["id"],
-                ),
+                (user["id"],),
             )
 
-        db_cursor.execute(
-            """
-            SELECT * FROM Users
-            WHERE id = ?
-            """,
-            (user["id"],),
-        )
+            updated_user = db_cursor.fetchone()
+            updated_user_dict = dict(updated_user)
 
-        updated_user = db_cursor.fetchone()
-        updated_user_dict = dict(updated_user)
+            if "profile_image" in updated_user_dict:
+                del updated_user_dict["profile_image"]
 
-        if "profile_image" in updated_user_dict:
-            del updated_user_dict["profile_image"]
-
-        return json.dumps(updated_user_dict)
+            return json.dumps(updated_user_dict)
+    except sqlite3.IntegrityError as exc:
+        return json.dumps({"ok": False, "error": str(exc)})
 
 
 def __get_subscriptions__(user_id, db_cursor=None):

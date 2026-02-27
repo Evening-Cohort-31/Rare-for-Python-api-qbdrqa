@@ -366,3 +366,48 @@ WHERE updated_at IS NULL
 UPDATE Posts
 SET updated_at = publication_date
 WHERE updated_at IS NULL
+
+DROP TRIGGER IF EXISTS users_block_inactive_admin_promotion
+
+-- 1) Cannot promote inactive user to admin
+CREATE TRIGGER users_block_inactive_admin_promotion
+BEFORE UPDATE OF type ON Users
+WHEN NEW.type = 'admin' AND OLD.type = "author" AND NEW.active = 0
+BEGIN
+  SELECT RAISE(ABORT, 'Must activate user before promoting to admin');
+END;
+
+-- 2a) Cannot delete last admin
+CREATE TRIGGER users_block_delete_last_admin
+BEFORE DELETE ON Users
+WHEN OLD.type = 'admin'
+  AND (SELECT COUNT(*) FROM Users WHERE type = 'admin' AND id <> OLD.id) = 0
+BEGIN
+  SELECT RAISE(ABORT, 'Cannot delete the last admin');
+END;
+
+-- 2b) Cannot deactivate last admin
+CREATE TRIGGER users_block_deactivate_last_admin
+BEFORE UPDATE OF active ON Users
+WHEN OLD.type = 'admin' AND OLD.active = 1 AND NEW.active = 0
+  AND (SELECT COUNT(*) FROM Users WHERE type = 'admin' AND id <> OLD.id) = 0
+BEGIN
+  SELECT RAISE(ABORT, 'Cannot deactivate the last admin');
+END;
+
+-- 2c) Cannot demote last admin to author
+CREATE TRIGGER users_block_demote_last_admin
+BEFORE UPDATE OF type ON Users
+WHEN OLD.type = 'admin' AND NEW.type = 'author'
+  AND (SELECT COUNT(*) FROM Users WHERE type = 'admin' AND id <> OLD.id) = 0
+BEGIN
+  SELECT RAISE(ABORT, 'Cannot demote the last admin');
+END;
+
+-- 3) If admin is deactivated, auto-demote to author
+CREATE TRIGGER users_demote_admin_on_deactivate
+AFTER UPDATE OF active ON Users
+WHEN OLD.active = 1 AND NEW.active = 0 AND NEW.type = 'admin'
+BEGIN
+  UPDATE Users SET type = 'author' WHERE id = NEW.id;
+END;

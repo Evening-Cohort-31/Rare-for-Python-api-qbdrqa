@@ -192,6 +192,9 @@ class JSONServer(HandleRequests):
         if url["requested_resource"] == "users":
             if pk != 0:
                 response_body = update_user(request_body)
+                json_body = json.loads(response_body)
+                if json_body.get("ok") is False:
+                    return self.response(response_body, status.HTTP_409_CONFLICT.value)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
         return self.response(
