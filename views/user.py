@@ -53,9 +53,19 @@ def create_user(user):
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
+        blob_data = None
+        if "profile_image" in user and user["profile_image"]:
+            # Check if it's already binary data (from formData) or a file path
+            if isinstance(user["profile_image"], bytes):
+                blob_data = user["profile_image"]
+            else:
+                # Fallback for file path (backwards compatibility)
+                with open(user["profile_image"], "rb") as file:
+                    blob_data = file.read()
+
         db_cursor.execute(
             """
-        Insert into Users (first_name, last_name, username, email, password, bio, created_on, active, type) values (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        Insert into Users (first_name, last_name, username, email, password, bio, profile_image, created_on, active, type) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         """,
             (
                 user["first_name"],
@@ -64,6 +74,7 @@ def create_user(user):
                 user["email"],
                 user["password"],
                 user["bio"],
+                blob_data,
                 datetime.now(),
                 user["type"],
             ),
@@ -146,6 +157,10 @@ def get_user(user_id):
 
         user = dict(db_cursor.fetchone())
 
+        # Remove profile_image blob (not JSON serializable), keep profile_image_url
+        if "profile_image" in user:
+            del user["profile_image"]
+
         user["subscriptions"] = json.loads(
             __get_subscriptions__(user_id, db_cursor)["subscriptions"]
         )
@@ -198,8 +213,13 @@ def update_user(user):
         )
 
         updated_user = db_cursor.fetchone()
+        updated_user_dict = dict(updated_user)
 
-        return json.dumps(dict(updated_user))
+        # Remove profile_image blob (not JSON serializable), keep profile_image_url
+        if "profile_image" in updated_user_dict:
+            del updated_user_dict["profile_image"]
+
+        return json.dumps(updated_user_dict)
 
 
 def __get_subscriptions__(user_id, db_cursor=None):
@@ -321,3 +341,16 @@ def delete_subscription(user_id, sub_id):
         )
 
         return json.dumps({"deleted": "true"})
+
+
+# views/user.py
+def get_user_profile_image(user_id):
+    """Returns only the profile image blob"""
+    with sqlite3.connect(DB_PATH) as conn:
+        db_cursor = conn.cursor()
+        db_cursor.execute(
+            "SELECT profile_image FROM Users WHERE id = ?",
+            (user_id,)
+        )
+        result = db_cursor.fetchone()
+        return result[0] if result and result[0] else None

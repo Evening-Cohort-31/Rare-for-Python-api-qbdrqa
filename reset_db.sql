@@ -340,3 +340,7 @@ INSERT INTO DemotionQueue ('action', 'admin_id', 'approver_one_id')
 VALUES 
 ('demote', 9, 3),
 ('demote', 15, 3);
+
+-- Run This to Add profile_image blobs
+ALTER TABLE Users
+ADD COLUMN profile_image BLOB

@@ -1,6 +1,8 @@
 import json
-from http.server import HTTPServer
+from http.server import ThreadingHTTPServer
 from nss_handler import HandleRequests, status
+import imghdr
+
 
 from views.comment import create_comment, get_comments_by_post_id
 from views.post import create_post, get_user_posts, update_post, get_all_posts, get_post_by_id, get_posts_by_tag_id, get_unapproved_posts, approve_post, search_posts_by_title, delete_post, get_subscribed_posts
@@ -12,7 +14,8 @@ from views.user import (
     get_user, 
     list_users,
     add_subscription,
-    delete_subscription
+    delete_subscription,
+    get_user_profile_image
 )
 from views.category import get_all_categories, create_category, get_category_by_id
 from views.tag import get_tags, get_tag_by_id, create_tag
@@ -35,6 +38,31 @@ class JSONServer(HandleRequests):
             if url["pk"] != 0:
                 response_body = get_user(url["pk"])
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            if "image" in query_params:
+                user_id = query_params["image"][0]
+                image_data = get_user_profile_image(user_id)        
+                if image_data:
+                    try:
+                        # Detect actual image type
+                        image_type = imghdr.what(None, h=image_data)
+                        content_type = f"image/{image_type}" if image_type else "image/jpeg"
+                        
+                        self.send_response(200)
+                        self.send_header("Content-Type", content_type)
+                        self.send_header("Content-Length", str(len(image_data)))
+                        self.send_header("Cache-Control", "max-age=86400")
+                        self.send_header("Access-Control-Allow-Origin", "*")
+                        self.end_headers()
+                        self.wfile.write(image_data)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+                else:
+                    self.send_response(404)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(b'{"error": "Image not found"}')
+                return
             response_body = list_users()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
             
@@ -143,14 +171,17 @@ class JSONServer(HandleRequests):
         url = self.parse_url(self.path)
         query_params = url["query_params"] 
 
+        content_type = self.headers.get('content-type', '')
+
+        if url["requested_resource"] == "register" and content_type.startswith('multipart/form-data'):
+            request_body = self.parse_multipart()
+            response_body = create_user(request_body)
+            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
+
         content_len = int(self.headers.get("content-length", 0))
         request_body = self.rfile.read(content_len)
         if (request_body):
             request_body = json.loads(request_body)
-
-        if url["requested_resource"] == "register":
-            response_body = create_user(request_body)
-            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
         if url["requested_resource"] == "login":
             response_body = login_user(request_body)
@@ -184,7 +215,7 @@ class JSONServer(HandleRequests):
 def main():
     host = ""
     port = 8000
-    HTTPServer((host, port), JSONServer).serve_forever()
+    ThreadingHTTPServer((host, port), JSONServer).serve_forever()
 
 
 if __name__ == "__main__":
