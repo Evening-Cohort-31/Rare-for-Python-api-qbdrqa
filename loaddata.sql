@@ -302,3 +302,9 @@ VALUES (5, 7, "2025-02-23")
 
   DELETE FROM Subscriptions
   WHERE id IS NOT NULL
+
+  ALTER TABLE Users
+  DROP COLUMN profile_image_url;
+
+  ALTER TABLE Posts
+  DROP COLUMN image_url;
