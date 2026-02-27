@@ -107,8 +107,7 @@ def list_users():
             u.bio,
             u.created_on,
             u.active,
-            u.type,
-            u.profile_image_url
+            u.type
         from Users u
         """
         )
@@ -129,7 +128,6 @@ def list_users():
                 "active": row["active"],
                 "type": row["type"],
                 "is_staff": True if row["type"] == "admin" else False,
-                "profile_image_url": row["profile_image_url"],
             }
             users.append(user)
 
@@ -157,7 +155,6 @@ def get_user(user_id):
 
         user = dict(db_cursor.fetchone())
 
-        # Remove profile_image blob (not JSON serializable), keep profile_image_url
         if "profile_image" in user:
             del user["profile_image"]
 
@@ -185,7 +182,6 @@ def update_user(user):
                 bio = ?,
                 username = ?,
                 password = ?,
-                profile_image_url = ?,
                 active = ?,
                 type = ?
             WHERE id = ?
@@ -197,7 +193,6 @@ def update_user(user):
                 user["bio"],
                 user["username"],
                 user["password"],
-                user["profile_image_url"],
                 user["active"],
                 user["type"],
                 user["id"],
@@ -215,7 +210,6 @@ def update_user(user):
         updated_user = db_cursor.fetchone()
         updated_user_dict = dict(updated_user)
 
-        # Remove profile_image blob (not JSON serializable), keep profile_image_url
         if "profile_image" in updated_user_dict:
             del updated_user_dict["profile_image"]
 
@@ -354,3 +348,4 @@ def get_user_profile_image(user_id):
         )
         result = db_cursor.fetchone()
         return result[0] if result and result[0] else None
+    

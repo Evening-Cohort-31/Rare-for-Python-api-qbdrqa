@@ -344,3 +344,10 @@ VALUES
 -- Run This to Add profile_image blobs
 ALTER TABLE Users
 ADD COLUMN profile_image BLOB
+
+ALTER TABLE Posts
+ADD COLUMN image BLOB
+
+UPDATE Posts
+SET approved = 1
+WHERE approved = 'true'
