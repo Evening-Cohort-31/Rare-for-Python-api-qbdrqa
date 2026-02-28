@@ -35,7 +35,8 @@ def create_comment(comment):
                 c.subject,
                 c.content,
                 c.created_on,
-                u.first_name || ' ' || u.last_name AS author_display_name
+                u.first_name || ' ' || u.last_name AS author_display_name,
+                u.id AS author_id
             FROM Comments c
             JOIN Users u ON u.id = c.author_id
             WHERE c.id = ?
@@ -60,7 +61,8 @@ def get_comments_by_post_id(post_id):
                 c.subject,
                 c.content,
                 c.created_on,
-                u.first_name || ' ' || u.last_name AS author_display_name
+                u.first_name || ' ' || u.last_name AS author_display_name,
+                u.id AS author_id
             FROM Comments c
             JOIN Users u ON u.id = c.author_id
             WHERE c.post_id = ?
@@ -88,7 +90,7 @@ def get_comment_by_id(comment_id):
                 u.first_name || ' ' || u.last_name AS author_display_name,
                 u.id AS author_id
             FROM Comments c
-            JOIN Users u ON u.id = c.author_id
+            LEFT JOIN Users u ON u.id = c.author_id
             WHERE c.id = ?
             """,
             (comment_id,),

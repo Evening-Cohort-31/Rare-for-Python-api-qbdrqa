@@ -1,8 +1,17 @@
 import json
+import imghdr
+
 from http.server import ThreadingHTTPServer
 from nss_handler import HandleRequests, status
 
-from views.comment import create_comment, get_comments_by_post_id
+
+from views.comment import (
+    create_comment,
+    get_comments_by_post_id,
+    update_comment,
+    get_comment_by_id,
+)
+
 from views.post import (
     create_post,
     get_user_posts,
@@ -14,9 +23,19 @@ from views.post import (
     approve_post,
     search_posts_by_title,
     delete_post,
+    get_subscribed_posts,
 )
 
-from views.user import create_user, login_user, update_user, get_user, list_users
+from views.user import (
+    create_user,
+    login_user,
+    update_user,
+    get_user_profile_image,
+    get_user,
+    list_users,
+    delete_subscription,
+    add_subscription,
+)
 from views.category import get_all_categories, create_category, get_category_by_id
 from views.tag import get_tags, get_tag_by_id, create_tag
 
@@ -35,7 +54,7 @@ class JSONServer(HandleRequests):
                 "{}", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
             )
 
-        elif url["requested_resource"] == "users":
+        if url["requested_resource"] == "users":
             # /users or /users/<id>
             if url["pk"] != 0:
                 response_body = get_user(url["pk"])
@@ -69,7 +88,7 @@ class JSONServer(HandleRequests):
             response_body = list_users()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
-        elif url["requested_resource"] == "posts":
+        if url["requested_resource"] == "posts":
             # /posts/<id>
             if url["pk"] != 0:
                 if (
@@ -107,7 +126,7 @@ class JSONServer(HandleRequests):
             response_body = get_all_posts()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
-        elif url["requested_resource"] == "tags":
+        if url["requested_resource"] == "tags":
             # /tags or /tags/<id>
             if url["pk"] != 0:
                 response_body = get_tag_by_id(url["pk"])
@@ -116,7 +135,7 @@ class JSONServer(HandleRequests):
             response_body = get_tags()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
-        elif url["requested_resource"] == "categories":
+        if url["requested_resource"] == "categories":
             # /categories or /categories/<id>
             if url["pk"] != 0:
                 response_body = get_category_by_id(url["pk"])
@@ -125,47 +144,68 @@ class JSONServer(HandleRequests):
             response_body = get_all_categories()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
-        else:
-            return self.response(
-                "", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
-            )
+        if url["requested_resource"] == "comments":
+            if url["pk"] != 0:
+                response_body = get_comment_by_id(url["pk"])
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            if "post_id" in query_params:
+                post_id = query_params["post_id"][0]
+                response_body = get_comments_by_post_id(post_id)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            return self.response("[]", status.HTTP_200_SUCCESS.value)
+        return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
     def do_POST(self):
         """Handle POST requests from a client"""
         url = self.parse_url(self.path)
+        query_params = url["query_params"]
 
-        content_len = int(self.headers.get("content-length", 0))
-        request_body = self.rfile.read(content_len)
-        request_body = json.loads(request_body)
+        content_type = self.headers.get("content-type", "")
+        if content_type.startswith("multipart/form-data"):
+            request_body = self.parse_multipart()
+        else:
+            content_len = int(self.headers.get("content-length", 0))
+            request_body = self.rfile.read(content_len)
+            if request_body:
+                request_body = json.loads(request_body)
+            else:
+                request_body = {}
 
         if url["requested_resource"] == "register":
             response_body = create_user(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
-        elif url["requested_resource"] == "login":
+        if url["requested_resource"] == "login":
             response_body = login_user(request_body)
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
-        elif url["requested_resource"] in ("post", "posts"):
-            response_body = create_post(request_body)
-            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
-
-        elif url["requested_resource"] == "comments":
+        if url["requested_resource"] == "comments":
             response_body = create_comment(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
-        elif url["requested_resource"] == "categories":
+        if url["requested_resource"] in ("new_post", "post", "posts"):
+            response_body = create_post(request_body)
+            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
+
+        if url["requested_resource"] == "categories":
             response_body = create_category(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
-        elif url["requested_resource"] == "tags":
+        if url["requested_resource"] == "tags":
             response_body = create_tag(request_body)
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
-        else:
-            return self.response(
-                "", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
-            )
+        if url["requested_resource"] == "users":
+            if url["pk"] != 0:
+                if "sub_id" in query_params:
+                    response_body = add_subscription(
+                        url["pk"], query_params["sub_id"][0]
+                    )
+                    return self.response(
+                        response_body, status.HTTP_201_SUCCESS_CREATED.value
+                    )
+
+        return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
     def do_PUT(self):
         """Handle PUT requests from a client"""
@@ -221,58 +261,6 @@ class JSONServer(HandleRequests):
         return self.response(
             "Not found", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
         )
-
-    def do_POST(self):
-        """Handle POST requests from a client"""
-        url = self.parse_url(self.path)
-        query_params = url["query_params"]
-
-        content_type = self.headers.get("content-type", "")
-        if content_type.startswith("multipart/form-data"):
-            request_body = self.parse_multipart()
-        else:
-            content_len = int(self.headers.get("content-length", 0))
-            request_body = self.rfile.read(content_len)
-            if request_body:
-                request_body = json.loads(request_body)
-            else:
-                request_body = {}
-
-        if url["requested_resource"] == "register":
-            response_body = create_user(request_body)
-            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
-
-        if url["requested_resource"] == "login":
-            response_body = login_user(request_body)
-            return self.response(response_body, status.HTTP_200_SUCCESS.value)
-
-        if url["requested_resource"] == "comments":
-            response_body = create_comment(request_body)
-            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
-
-        if url["requested_resource"] in ("new_post", "post", "posts"):
-            response_body = create_post(request_body)
-            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
-
-        if url["requested_resource"] == "categories":
-            response_body = create_category(request_body)
-            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
-
-        if url["requested_resource"] == "tags":
-            response_body = create_tag(request_body)
-            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
-
-        if url["requested_resource"] == "users":
-            if url["pk"] != 0:
-                if "sub_id" in query_params:
-                    response_body = add_subscription(
-                        url["pk"], query_params["sub_id"][0]
-                    )
-                    return self.response(
-                        response_body, status.HTTP_201_SUCCESS_CREATED.value
-                    )
-
-        return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
 
 def main():
