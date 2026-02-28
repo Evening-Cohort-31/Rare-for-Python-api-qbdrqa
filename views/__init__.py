@@ -24,6 +24,8 @@ from .post import (
     get_subscribed_posts,
     search_posts_by_title,
     get_post_header_image,
+    get_posts_by_category_id,
+    get_post_title
 )
 
 from .tag import (
