@@ -1,7 +1,16 @@
+"""
+category.py
+
+This module provides CRUD functions for the Categories Table
+"""
 import sqlite3
 import json
+from pathlib import Path
+
+DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
 def get_all_categories():
+    """Returns a list of all Categories"""
     with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -16,8 +25,9 @@ def get_all_categories():
         categories = db_cursor.fetchall()
 
         return json.dumps([dict(row) for row in categories])
-    
-def get_category_by_id(id):
+
+def get_category_by_id(category_id):
+    """Returns the Category with the provided id"""
     with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -27,7 +37,7 @@ def get_category_by_id(id):
             SELECT * FROM Categories
             WHERE id = ?
             """,
-            (id,),
+            (category_id,),
         )
 
         category = db_cursor.fetchone()
@@ -35,6 +45,7 @@ def get_category_by_id(id):
         return json.dumps(dict(category))
 
 def create_category(category):
+    """Creates a new category"""
     with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -48,18 +59,32 @@ def create_category(category):
             (category["label"],),
         )
 
-        categoryId = db_cursor.lastrowid
+        category_id = db_cursor.lastrowid
 
         db_cursor.execute(
             """
             SELECT * FROM Categories
             WHERE id = ?
             """, (
-                categoryId,
+                category_id,
             ),
         )
 
         category = db_cursor.fetchone()
-        
 
         return json.dumps(dict(category))
+
+def delete_category(category_id):
+    """Deletes the category with the provided id"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            DELETE FROM Categories
+            WHERE id = ?
+            """, (category_id,)
+        )
+
+        return json.dumps({"deleted": True})

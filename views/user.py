@@ -1,10 +1,15 @@
+"""
+user.py
+
+This module provides CRUD functions for the Users table
+"""
+
 import sqlite3
 import json
 from datetime import datetime
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
-
 
 def login_user(user):
     """Checks for the user in the database
@@ -13,8 +18,8 @@ def login_user(user):
         user (dict): Contains the username and password of the user trying to login
 
     Returns:
-        json string: If the user was found will return valid boolean of True and the user's id as the token
-                     If the user was not found will return valid boolean False
+        json string: If user, returns True and the user's id as the token
+                     If no user found, returns False
     """
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -38,7 +43,6 @@ def login_user(user):
             response = {"valid": False}
 
         return json.dumps(response)
-
 
 def create_user(user):
     """Adds a user to the database when they register
@@ -65,7 +69,21 @@ def create_user(user):
 
         db_cursor.execute(
             """
-        Insert into Users (first_name, last_name, username, email, password, bio, profile_image, created_on, active, type, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?,?)
+        Insert into Users 
+        (
+            first_name, 
+            last_name, 
+            username, 
+            email, 
+            password, 
+            bio, 
+            profile_image, 
+            created_on, 
+            active, 
+            type, 
+            updated_at
+        ) 
+        values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?,?)
         """,
             (
                 user["first_name"],
@@ -81,10 +99,9 @@ def create_user(user):
             ),
         )
 
-        id = db_cursor.lastrowid
+        user_id = db_cursor.lastrowid
 
-        return json.dumps({"token": id, "valid": True})
-
+        return json.dumps({"token": user_id, "valid": True})
 
 def list_users():
     """Returns a list of all users from the database
@@ -150,8 +167,8 @@ def list_users():
 
         return json.dumps(users)
 
-
 def get_user(user_id):
+    """Returns the specified user"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -186,8 +203,8 @@ def get_user(user_id):
         )
         return json.dumps(user)
 
-
 def update_user(user):
+    """Updates the specified user"""
     try:
         with sqlite3.connect(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
@@ -335,7 +352,6 @@ def update_user(user):
     except sqlite3.IntegrityError as exc:
         return json.dumps({"ok": False, "error": str(exc)})
 
-
 def __get_subscriptions__(user_id, db_cursor=None):
     execution = """
             SELECT
@@ -361,7 +377,6 @@ def __get_subscriptions__(user_id, db_cursor=None):
     subscriptions = dict(db_cursor.fetchone())
 
     return subscriptions
-
 
 def __get_subscribers__(user_id, db_cursor=None):
     execution = """
@@ -390,8 +405,8 @@ def __get_subscribers__(user_id, db_cursor=None):
 
     return subscribers
 
-
 def add_subscription(user_id, sub_id):
+    """Creates a new subscription"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -436,8 +451,8 @@ def add_subscription(user_id, sub_id):
 
         return json.dumps(dict(subscription))
 
-
 def delete_subscription(user_id, sub_id):
+    """Deletes a subscription"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -456,8 +471,6 @@ def delete_subscription(user_id, sub_id):
 
         return json.dumps({"deleted": "true"})
 
-
-# views/user.py
 def get_user_profile_image(user_id):
     """Returns only the profile image blob"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -466,7 +479,6 @@ def get_user_profile_image(user_id):
         db_cursor.execute("SELECT profile_image FROM Users WHERE id = ?", (user_id,))
         result = db_cursor.fetchone()
         return result[0] if result and result[0] else None
-
 
 def __handle_demotion__(action, user_id, approver_id, db_cursor):
     try:

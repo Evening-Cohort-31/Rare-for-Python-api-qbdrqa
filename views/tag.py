@@ -1,7 +1,14 @@
+"""
+tag.py
+
+This module provides CRUD functions for the Tags table
+"""
+
 import sqlite3
 import json
 
 def get_tags():
+    """Returns all tags"""
     with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -15,9 +22,9 @@ def get_tags():
         tags = db_cursor.fetchall()
 
         return json.dumps([dict(row) for row in tags])
-        
 
-def get_tag_by_id(id):
+def get_tag_by_id(tag_id):
+    """Returns the specified tag"""
     with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -26,15 +33,15 @@ def get_tag_by_id(id):
         """
         SELECT * FROM Tags
         WHERE id = ?
-        """, (id,),
+        """, (tag_id,),
         )
 
         tag = db_cursor.fetchone()
 
         return dict(tag)
-    
 
 def create_tag(tag):
+    """Creates a new tag"""
     with sqlite3.connect("./db.sqlite3") as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
