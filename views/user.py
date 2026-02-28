@@ -98,18 +98,30 @@ def list_users():
 
         db_cursor.execute(
             """
-        select
-            u.id,
-            u.first_name,
-            u.last_name,
-            u.username,
-            u.email,
-            u.password,
-            u.bio,
-            u.created_on,
-            u.active,
-            u.type
-        from Users u
+            SELECT
+                u.id,
+                u.first_name,
+                u.last_name,
+                u.username,
+                u.email,
+                u.password,
+                u.bio,
+                u.created_on,
+                u.active,
+                u.type,
+                CASE
+                    WHEN d.admin_id IS NOT NULL THEN
+                        json_group_array(json_object(
+                            'action', d.action,
+                            'admin_id', d.admin_id,
+                            'approver_one_id', d.approver_one_id
+                        ))
+                    ELSE NULL
+                END AS demotion_queue
+            FROM Users u
+            LEFT JOIN DemotionQueue d
+            ON d.admin_id = u.id
+            GROUP BY u.id
         """
         )
 
@@ -130,6 +142,10 @@ def list_users():
                 "type": row["type"],
                 "is_staff": True if row["type"] == "admin" else False,
             }
+
+            if row["demotion_queue"] is not None:
+                user["demotion_queue"] = json.loads(row["demotion_queue"])
+
             users.append(user)
 
         return json.dumps(users)
@@ -177,87 +193,143 @@ def update_user(user):
             conn.row_factory = sqlite3.Row
             db_cursor = conn.cursor()
 
+            action_payload = user.get("action")
+            if action_payload:
+                demotion_result = __handle_demotion__(
+                    action_payload.get("action"),
+                    action_payload.get("user_id"),
+                    action_payload.get("approver_id"),
+                    db_cursor,
+                )
+
+                if not isinstance(demotion_result, dict):
+                    return json.dumps(
+                        {
+                            "ok": False,
+                            "error": "Unable to process action request.",
+                        }
+                    )
+
+                if demotion_result.get("ok") is False:
+                    return json.dumps(demotion_result)
+
             has_new_image = "profile_image" in user and user["profile_image"]
             blob_data = None
 
-            if has_new_image:
-                if isinstance(user["profile_image"], bytes):
+            should_update_profile = all(
+                key in user
+                for key in [
+                    "id",
+                    "first_name",
+                    "last_name",
+                    "email",
+                    "bio",
+                    "username",
+                    "password",
+                ]
+            )
+
+            if should_update_profile:
+                if has_new_image and isinstance(user["profile_image"], bytes):
                     blob_data = user["profile_image"]
 
-            if has_new_image:
-                db_cursor.execute(
-                    """
-                    UPDATE Users
-                    SET
-                        first_name = ?,
-                        last_name = ?,
-                        email = ?,
-                        bio = ?,
-                        username = ?,
-                        password = ?,
-                        active = ?,
-                        type = ?,
-                        profile_image = ?,
-                        updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (
-                        user["first_name"],
-                        user["last_name"],
-                        user["email"],
-                        user["bio"],
-                        user["username"],
-                        user["password"],
-                        user["active"],
-                        user["type"],
-                        blob_data,
-                        datetime.now(),
-                        user["id"],
-                    ),
-                )
-            else:
-                db_cursor.execute(
-                    """
-                    UPDATE Users
-                    SET
-                        first_name = ?,
-                        last_name = ?,
-                        email = ?,
-                        bio = ?,
-                        username = ?,
-                        password = ?,
-                        active = ?,
-                        type = ?,
-                        updated_at = ?
-                    WHERE id = ?
-                    """,
-                    (
-                        user["first_name"],
-                        user["last_name"],
-                        user["email"],
-                        user["bio"],
-                        user["username"],
-                        user["password"],
-                        user["active"],
-                        user["type"],
-                        datetime.now(),
-                        user["id"],
-                    ),
-                )
+                if has_new_image:
+                    db_cursor.execute(
+                        """
+                        UPDATE Users
+                        SET
+                            first_name = ?,
+                            last_name = ?,
+                            email = ?,
+                            bio = ?,
+                            username = ?,
+                            password = ?,
+                            profile_image = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            user["first_name"],
+                            user["last_name"],
+                            user["email"],
+                            user["bio"],
+                            user["username"],
+                            user["password"],
+                            blob_data,
+                            datetime.now(),
+                            user["id"],
+                        ),
+                    )
+                else:
+                    db_cursor.execute(
+                        """
+                        UPDATE Users
+                        SET
+                            first_name = ?,
+                            last_name = ?,
+                            email = ?,
+                            bio = ?,
+                            username = ?,
+                            password = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            user["first_name"],
+                            user["last_name"],
+                            user["email"],
+                            user["bio"],
+                            user["username"],
+                            user["password"],
+                            datetime.now(),
+                            user["id"],
+                        ),
+                    )
+
+            target_user_id = (
+                action_payload.get("user_id") if action_payload else user.get("id")
+            )
+
+            if target_user_id is None:
+                return json.dumps({"ok": False, "error": "User id is required."})
 
             db_cursor.execute(
                 """
-                SELECT * FROM Users
-                WHERE id = ?
+                SELECT
+                    u.*,
+                    CASE
+                        WHEN d.admin_id IS NOT NULL THEN
+                            json_group_array(json_object(
+                                'action', d.action,
+                                'admin_id', d.admin_id,
+                                'approver_one_id', d.approver_one_id
+                            ))
+                        ELSE NULL
+                    END AS demotion_queue
+                FROM Users u
+                LEFT JOIN DemotionQueue d
+                ON d.admin_id = u.id
+                WHERE u.id = ?
+                GROUP BY u.id
                 """,
-                (user["id"],),
+                (target_user_id,),
             )
 
             updated_user = db_cursor.fetchone()
+            if updated_user is None:
+                return json.dumps({"ok": False, "error": "User not found."})
+
             updated_user_dict = dict(updated_user)
 
             if "profile_image" in updated_user_dict:
                 del updated_user_dict["profile_image"]
+
+            if updated_user_dict.get("demotion_queue") is not None:
+                updated_user_dict["demotion_queue"] = json.loads(
+                    updated_user_dict["demotion_queue"]
+                )
+            else:
+                updated_user_dict.pop("demotion_queue", None)
 
             return json.dumps(updated_user_dict)
     except sqlite3.IntegrityError as exc:
@@ -389,7 +461,167 @@ def delete_subscription(user_id, sub_id):
 def get_user_profile_image(user_id):
     """Returns only the profile image blob"""
     with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
         db_cursor.execute("SELECT profile_image FROM Users WHERE id = ?", (user_id,))
         result = db_cursor.fetchone()
         return result[0] if result and result[0] else None
+
+
+def __handle_demotion__(action, user_id, approver_id, db_cursor):
+    try:
+        if not action:
+            return {"ok": False, "error": "Action is required."}
+
+        if user_id is None:
+            return {"ok": False, "error": "Action user_id is required."}
+
+        if action == "activate":
+            db_cursor.execute(
+                """
+                UPDATE Users
+                SET active = 1
+                WHERE id = ?
+                """,
+                (user_id,),
+            )
+            return {"ok": True}
+
+        if action == "promote":
+            db_cursor.execute(
+                """
+                UPDATE Users
+                SET type = 'admin'
+                WHERE id = ?
+                """,
+                (user_id,),
+            )
+            return {"ok": True}
+
+        if action == "cancel deactivate":
+            db_cursor.execute(
+                """
+                DELETE FROM DemotionQueue
+                WHERE admin_id = ?
+                AND action = 'deactivate'
+                """,
+                (user_id,),
+            )
+            return {"ok": True}
+
+        if action == "cancel demote":
+            db_cursor.execute(
+                """
+                DELETE FROM DemotionQueue
+                WHERE admin_id = ?
+                AND action = 'demote'
+                """,
+                (user_id,),
+            )
+            return {"ok": True}
+
+        db_cursor.execute(
+            """
+            SELECT u.type
+            FROM Users u
+            WHERE u.id = ?
+            """,
+            (user_id,),
+        )
+
+        row = db_cursor.fetchone()
+        if row is None:
+            return {"ok": False, "error": "User not found."}
+
+        user_type = row["type"]
+
+        if user_type == "author" and action == "deactivate":
+            db_cursor.execute(
+                """
+                UPDATE Users
+                SET active = 0
+                WHERE id = ?
+                """,
+                (user_id,),
+            )
+            return {"ok": True}
+
+        db_cursor.execute(
+            """
+            SELECT * FROM DemotionQueue
+            WHERE admin_id = ?
+            AND action = ?
+            """,
+            (user_id, action),
+        )
+
+        pending_action = db_cursor.fetchone()
+
+        if pending_action is None:
+            db_cursor.execute(
+                """
+                INSERT INTO DemotionQueue
+                (action, admin_id, approver_one_id)
+                VALUES (?, ?, ?)
+                """,
+                (
+                    action,
+                    user_id,
+                    approver_id,
+                ),
+            )
+            return {"ok": True, "pending_approval": True}
+
+        if pending_action["approver_one_id"] == approver_id:
+            return {
+                "ok": False,
+                "error": "Action must be completed by a different admin.",
+            }
+
+        if action == "demote":
+            db_cursor.execute(
+                """
+                UPDATE Users
+                SET type = 'author'
+                WHERE id = ?
+                """,
+                (user_id,),
+            )
+
+            db_cursor.execute(
+                """
+                DELETE FROM DemotionQueue
+                WHERE action = ?
+                AND admin_id= ?
+                """,
+                (
+                    action,
+                    user_id,
+                ),
+            )
+
+            return {"ok": True}
+
+        if action == "deactivate":
+            db_cursor.execute(
+                """
+                UPDATE Users
+                SET active = 0
+                WHERE id = ?
+                """,
+                (user_id,),
+            )
+
+            db_cursor.execute(
+                """
+                DELETE FROM DemotionQueue
+                WHERE admin_id = ?
+                """,
+                (user_id,),
+            )
+
+            return {"ok": True}
+
+        return {"ok": False, "error": f"Unsupported action: {action}"}
+    except sqlite3.IntegrityError as exc:
+        return {"ok": False, "error": str(exc)}

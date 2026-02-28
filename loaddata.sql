@@ -308,3 +308,11 @@ VALUES (5, 7, "2025-02-23")
 
   ALTER TABLE Posts
   DROP COLUMN image_url;
+
+
+  UPDATE DemotionQueue
+  SET approver_one_id = 4
+  WHERE approver_one_id = 16
+
+  DELETE FROM DemotionQueue
+  WHERE action = 'cancel demotion'
