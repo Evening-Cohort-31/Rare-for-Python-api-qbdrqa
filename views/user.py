@@ -65,7 +65,7 @@ def create_user(user):
 
         db_cursor.execute(
             """
-        Insert into Users (first_name, last_name, username, email, password, bio, profile_image, created_on, active, type, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        Insert into Users (first_name, last_name, username, email, password, bio, profile_image, created_on, active, type, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?,?)
         """,
             (
                 user["first_name"],
