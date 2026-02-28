@@ -316,3 +316,13 @@ VALUES (5, 7, "2025-02-23")
 
   DELETE FROM DemotionQueue
   WHERE action = 'cancel demotion'
+
+
+  UPDATE Posts
+  SET category_id = 1
+  WHERE category_id = 'undefined'
+
+  DELETE FROM PostTags
+  WHERE id > 58
+
+  UPDATE sqlite_sequence SET seq=58 WHERE name = 'PostTags'

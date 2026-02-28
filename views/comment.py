@@ -3,6 +3,7 @@ comment.py
 
 This module provides CRUD functions for the Comments table
 """
+
 import sqlite3
 import json
 from datetime import datetime
@@ -42,6 +43,7 @@ def create_comment(comment):
                 c.content,
                 c.created_on,
                 u.first_name || ' ' || u.last_name AS author_display_name,
+                u.username,
                 u.id AS author_id
             FROM Comments c
             JOIN Users u ON u.id = c.author_id
@@ -80,6 +82,7 @@ def get_comments_by_post_id(post_id):
 
         return json.dumps([dict(row) for row in db_cursor.fetchall()])
 
+
 def get_comment_by_id(comment_id):
     """Returns the comment with the provided id"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -105,6 +108,7 @@ def get_comment_by_id(comment_id):
 
         row = db_cursor.fetchone()
         return json.dumps(dict(row)) if row else json.dumps({})
+
 
 def update_comment(comment_id, comment):
     """Updates the specified comment"""
@@ -141,4 +145,4 @@ def delete_comment(comment_id):
             (comment_id,),
         )
 
-    return True
+    return json.dumps({"deleted": True})

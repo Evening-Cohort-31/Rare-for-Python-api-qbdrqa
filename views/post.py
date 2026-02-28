@@ -90,6 +90,7 @@ def _fetch_related_data_for_posts(db_cursor, post_ids):
 
     return tags_by_post, comments_by_post, reactions_by_post
 
+
 def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_post):
     """Attaches the provided tags, comments, and reactions to their related Posts entries"""
     for post in posts:
@@ -104,8 +105,10 @@ def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_pos
 
     return posts
 
+
 def update_post_tags(post_id, tag_ids, db_cursor=None):
     """Updates the PostTags table for the provided post"""
+
     def _update_tags(cursor):
         cursor.execute(
             """
@@ -129,6 +132,7 @@ def update_post_tags(post_id, tag_ids, db_cursor=None):
         with sqlite3.connect(DB_PATH) as conn:
             cursor = conn.cursor()
             _update_tags(cursor)
+
 
 def create_post(post):
     """Creates a new post"""
@@ -186,6 +190,7 @@ def create_post(post):
 
         return new_post
 
+
 def get_all_posts():
     """Returns all approved posts of active users"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -220,6 +225,7 @@ def get_all_posts():
 
         return json.dumps(posts)
 
+
 def get_user_posts(user_id):
     """Returns all approved posts for the provided user"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -253,6 +259,7 @@ def get_user_posts(user_id):
         posts = _attach_related_data(posts, tags, comments, reactions)
 
         return json.dumps(posts)
+
 
 def get_post_by_id(post_id, cursor=None):
     """Returns the specified post"""
@@ -294,6 +301,7 @@ def get_post_by_id(post_id, cursor=None):
 
     return json.dumps(posts[0])
 
+
 def get_post_details(post_id):
     """Returns an approved posts with user info"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -332,6 +340,7 @@ def get_post_details(post_id):
             }
         )
 
+
 def update_post(post):
     """Updates a post"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -349,9 +358,6 @@ def update_post(post):
         if has_new_image:
             if isinstance(post["image"], bytes):
                 blob_data = post["image"]
-            else:
-                with open(post["image"], "rb") as file:
-                    blob_data = file.read()
 
         # Build UPDATE query conditionally based on whether image is provided
         if has_new_image:
@@ -404,6 +410,7 @@ def update_post(post):
 
         return get_post_by_id(post["id"], db_cursor)
 
+
 def get_post_title(post_id):
     """Returns the title of the provided post"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -417,6 +424,7 @@ def get_post_title(post_id):
         )
         row = db_cursor.fetchone()
         return json.dumps(dict(row)) if row else json.dumps({})
+
 
 def get_unapproved_posts():
     """Returns all unapproved posts"""
@@ -451,6 +459,7 @@ def get_unapproved_posts():
 
         return json.dumps(posts)
 
+
 def approve_post(post_id):
     """Approves the specified post"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -465,13 +474,17 @@ def approve_post(post_id):
         )
 
         db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
+        row = db_cursor.fetchone()
+        if row is None:
+            return json.dumps({})
 
-        approved_post = dict(db_cursor.fetchone())
+        approved_post = dict(row)
 
         if "image" in approved_post:
             del approved_post["image"]
 
         return json.dumps(approved_post)
+
 
 def get_posts_by_tag_id(tag_id):
     """Returns all approved posts with the provided tag"""
@@ -510,6 +523,7 @@ def get_posts_by_tag_id(tag_id):
 
         return json.dumps(posts)
 
+
 def search_posts_by_title(search_term):
     """Returns any posts with the provided term in it's title"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -547,6 +561,7 @@ def search_posts_by_title(search_term):
 
         return json.dumps(posts)
 
+
 def delete_post(post_id):
     """Deletes the specified post"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -556,8 +571,9 @@ def delete_post(post_id):
         db_cursor.execute("DELETE FROM Posts WHERE id = ?", (post_id,))
         return json.dumps({"deleted": True})
 
+
 def get_subscribed_posts(user_id):
-    """"Returns a list of all approved posts of users the provided user is subscribed to."""
+    """ "Returns a list of all approved posts of users the provided user is subscribed to."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -605,6 +621,7 @@ def get_subscribed_posts(user_id):
         posts = _attach_related_data(posts, tags, comments, reactions)
 
         return json.dumps(posts)
+
 
 def get_post_header_image(post_id):
     """Returns only the profile image blob"""

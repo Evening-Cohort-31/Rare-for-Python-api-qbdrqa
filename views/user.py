@@ -11,6 +11,7 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
+
 def login_user(user):
     """Checks for the user in the database
 
@@ -43,6 +44,7 @@ def login_user(user):
             response = {"valid": False}
 
         return json.dumps(response)
+
 
 def create_user(user):
     """Adds a user to the database when they register
@@ -103,13 +105,14 @@ def create_user(user):
 
         return json.dumps({"token": user_id, "valid": True})
 
+
 def list_users():
     """Returns a list of all users from the database
 
     Returns:
         json string: A list of all users
     """
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -167,6 +170,7 @@ def list_users():
 
         return json.dumps(users)
 
+
 def get_user(user_id):
     """Returns the specified user"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -187,7 +191,11 @@ def get_user(user_id):
             (user_id,),
         )
 
-        user = dict(db_cursor.fetchone())
+        row = db_cursor.fetchone()
+        if row is None:
+            return json.dumps({})
+
+        user = dict(row)
 
         if "profile_image" in user:
             del user["profile_image"]
@@ -202,6 +210,7 @@ def get_user(user_id):
             __get_subscribers__(user_id, db_cursor)["subscribers"]
         )
         return json.dumps(user)
+
 
 def update_user(user):
     """Updates the specified user"""
@@ -352,6 +361,7 @@ def update_user(user):
     except sqlite3.IntegrityError as exc:
         return json.dumps({"ok": False, "error": str(exc)})
 
+
 def __get_subscriptions__(user_id, db_cursor=None):
     execution = """
             SELECT
@@ -377,6 +387,7 @@ def __get_subscriptions__(user_id, db_cursor=None):
     subscriptions = dict(db_cursor.fetchone())
 
     return subscriptions
+
 
 def __get_subscribers__(user_id, db_cursor=None):
     execution = """
@@ -404,6 +415,7 @@ def __get_subscribers__(user_id, db_cursor=None):
     subscribers = dict(db_cursor.fetchone())
 
     return subscribers
+
 
 def add_subscription(user_id, sub_id):
     """Creates a new subscription"""
@@ -451,6 +463,7 @@ def add_subscription(user_id, sub_id):
 
         return json.dumps(dict(subscription))
 
+
 def delete_subscription(user_id, sub_id):
     """Deletes a subscription"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -469,7 +482,8 @@ def delete_subscription(user_id, sub_id):
             ),
         )
 
-        return json.dumps({"deleted": "true"})
+        return json.dumps({"deleted": True})
+
 
 def get_user_profile_image(user_id):
     """Returns only the profile image blob"""
@@ -479,6 +493,7 @@ def get_user_profile_image(user_id):
         db_cursor.execute("SELECT profile_image FROM Users WHERE id = ?", (user_id,))
         result = db_cursor.fetchone()
         return result[0] if result and result[0] else None
+
 
 def __handle_demotion__(action, user_id, approver_id, db_cursor):
     try:
