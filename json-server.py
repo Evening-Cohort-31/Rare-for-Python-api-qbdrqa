@@ -284,9 +284,16 @@ class JSONServer(HandleRequests):
                 request_body = {}
 
         if url["requested_resource"] == "posts" and pk != 0:
-            # special admin approve route: PUT /posts/<id> with body {"approved": true}
+            # special admin approval route: PUT /posts/<id> with body {"approved": true|false}
             if "approved" in request_body and len(request_body) == 1:
-                response_body = approve_post(pk)
+                approved_value = request_body["approved"]
+                if not isinstance(approved_value, bool):
+                    return self.response(
+                        json.dumps({"error": "'approved' must be a boolean"}),
+                        status.HTTP_400_CLIENT_ERROR_BAD_REQUEST_DATA.value,
+                    )
+
+                response_body = approve_post(pk, approved_value)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
             response_body = update_post(request_body)
