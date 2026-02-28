@@ -3,15 +3,21 @@ from http.server import HTTPServer
 from nss_handler import HandleRequests, status
 
 from views.comment import create_comment, get_comments_by_post_id
-from views.post import create_post, get_user_posts, update_post, get_all_posts, get_post_by_id, get_posts_by_tag_id, get_unapproved_posts, approve_post, search_posts_by_title, delete_post
-
-from views.user import (
-    create_user,
-    login_user,
-    update_user,
-    get_user, 
-    list_users
+from views.post import (
+    create_post,
+    get_user_posts,
+    update_post,
+    get_all_posts,
+    get_post_by_id,
+    get_posts_by_tag_id,
+    get_unapproved_posts,
+    approve_post,
+    search_posts_by_title,
+    delete_post,
+    add_reaction,
 )
+
+from views.user import create_user, login_user, update_user, get_user, list_users
 from views.category import get_all_categories, create_category, get_category_by_id
 from views.tag import get_tags, get_tag_by_id, create_tag
 
@@ -53,15 +59,15 @@ class JSONServer(HandleRequests):
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
             if "tag_id" in query_params:
-                tag_id = query_params['tag_id'][0]
+                tag_id = query_params["tag_id"][0]
                 response_body = get_posts_by_tag_id(tag_id)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
-            
+
             if "title" in query_params:
-                search_term = query_params['title'][0]
+                search_term = query_params["title"][0]
                 response_body = search_posts_by_title(search_term)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
-            
+
             response_body = get_all_posts()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
@@ -145,6 +151,13 @@ class JSONServer(HandleRequests):
 
         if url["requested_resource"] == "comments":
             response_body = create_comment(request_body)
+            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
+        if url["requested_resource"] == "postReactions":
+            response_body = add_reaction(
+                request_body["post_id"],
+                request_body["user_id"],
+                request_body["reaction_id"],
+            )
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
         if url["requested_resource"] in ("new_post", "post", "posts"):

@@ -123,6 +123,7 @@ def update_post_tags(post_id, tag_ids, db_cursor=None):
             cursor = conn.cursor()
             _update_tags(cursor)
 
+
 def create_post(post):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -409,7 +410,8 @@ def approve_post(post_id):
 
         db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
         return json.dumps(dict(db_cursor.fetchone()))
-    
+
+
 def get_posts_by_tag_id(tag_id):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -482,7 +484,8 @@ def search_posts_by_title(search_term):
         posts = _attach_related_data(posts, tags, comments, reactions)
 
         return json.dumps(posts)
-    
+
+
 def delete_post(post_id):
     with sqlite3.connect(DB_PATH) as conn:
         db_cursor = conn.cursor()
@@ -490,3 +493,16 @@ def delete_post(post_id):
         db_cursor.execute("DELETE FROM Comments WHERE post_id = ?", (post_id,))
         db_cursor.execute("DELETE FROM Posts WHERE id = ?", (post_id,))
         return json.dumps({"deleted": True})
+
+
+def add_reaction(post_id, user_id, reaction_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        db_cursor = conn.cursor()
+        db_cursor.execute(
+            """
+            INSERT INTO PostReactions (user_id, reaction_id, post_id)
+            VALUES (?, ?, ?)
+            """,
+            (user_id, reaction_id, post_id),
+        )
+        return json.dumps({"id": db_cursor.lastrowid})
