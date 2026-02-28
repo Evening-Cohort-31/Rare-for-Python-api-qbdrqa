@@ -3,7 +3,6 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-
 DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
 
@@ -54,9 +53,19 @@ def create_user(user):
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
+        blob_data = None
+        if "profile_image" in user and user["profile_image"]:
+            # Check if it's already binary data (from formData) or a file path
+            if isinstance(user["profile_image"], bytes):
+                blob_data = user["profile_image"]
+            else:
+                # Fallback for file path (backwards compatibility)
+                with open(user["profile_image"], "rb") as file:
+                    blob_data = file.read()
+
         db_cursor.execute(
             """
-        Insert into Users (first_name, last_name, username, email, password, bio, created_on, active, type) values (?, ?, ?, ?, ?, ?, ?, 1, ?)
+        Insert into Users (first_name, last_name, username, email, password, bio, profile_image, created_on, active, type, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         """,
             (
                 user["first_name"],
@@ -65,14 +74,17 @@ def create_user(user):
                 user["email"],
                 user["password"],
                 user["bio"],
+                blob_data,
                 datetime.now(),
                 user["type"],
+                datetime.now(),
             ),
         )
 
         id = db_cursor.lastrowid
 
         return json.dumps({"token": id, "valid": True})
+
 
 def list_users():
     """Returns a list of all users from the database
@@ -96,8 +108,7 @@ def list_users():
             u.bio,
             u.created_on,
             u.active,
-            u.type,
-            u.profile_image_url
+            u.type
         from Users u
         """
         )
@@ -118,28 +129,46 @@ def list_users():
                 "active": row["active"],
                 "type": row["type"],
                 "is_staff": True if row["type"] == "admin" else False,
-                "profile_image_url": row["profile_image_url"],
             }
             users.append(user)
 
         return json.dumps(users)
 
-def get_user(userId):
-    with sqlite3.connect("./db.sqlite3") as conn:
+
+def get_user(user_id):
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
         db_cursor.execute(
             """
-        SELECT * FROM Users u
+        SELECT 
+            u.*,
+            COUNT(s.follower_id) AS subscriber_count
+        FROM Users u
+        LEFT JOIN Subscriptions s
+        ON s.author_id = u.id
         WHERE u.id = ?
+        GROUP BY u.id
         """,
-            (userId,),
+            (user_id,),
         )
 
-        user = db_cursor.fetchone()
+        user = dict(db_cursor.fetchone())
 
-        return json.dumps(dict(user))
+        if "profile_image" in user:
+            del user["profile_image"]
+
+        if "updated_at" in user:
+            user["image_version"] = user["updated_at"]
+
+        user["subscriptions"] = json.loads(
+            __get_subscriptions__(user_id, db_cursor)["subscriptions"]
+        )
+        user["subscribers"] = json.loads(
+            __get_subscribers__(user_id, db_cursor)["subscribers"]
+        )
+        return json.dumps(user)
 
 
 def update_user(user):
@@ -147,34 +176,73 @@ def update_user(user):
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
-        db_cursor.execute(
-            """
-            UPDATE Users
-            SET
-                first_name = ?,
-                last_name = ?,
-                email = ?,
-                bio = ?,
-                username = ?,
-                password = ?,
-                profile_image_url = ?,
-                active = ?,
-                type = ?
-            WHERE id = ?
-            """,
-            (
-                user["first_name"],
-                user["last_name"],
-                user["email"],
-                user["bio"],
-                user["username"],
-                user["password"],
-                user["profile_image_url"],
-                user["active"],
-                user["type"],
-                user["id"],
-            ),
-        )
+        has_new_image = "profile_image" in user and user["profile_image"]
+        blob_data = None
+
+        if has_new_image:
+            if isinstance(user["profile_image"], bytes):
+                blob_data = user["profile_image"]
+
+        if has_new_image:
+            db_cursor.execute(
+                """
+                UPDATE Users
+                SET
+                    first_name = ?,
+                    last_name = ?,
+                    email = ?,
+                    bio = ?,
+                    username = ?,
+                    password = ?,
+                    active = ?,
+                    type = ?,
+                    profile_image = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    user["first_name"],
+                    user["last_name"],
+                    user["email"],
+                    user["bio"],
+                    user["username"],
+                    user["password"],
+                    user["active"],
+                    user["type"],
+                    blob_data,
+                    datetime.now(),
+                    user["id"],
+                ),
+            )
+        else:
+            db_cursor.execute(
+                """
+                UPDATE Users
+                SET
+                    first_name = ?,
+                    last_name = ?,
+                    email = ?,
+                    bio = ?,
+                    username = ?,
+                    password = ?,
+                    active = ?,
+                    type = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    user["first_name"],
+                    user["last_name"],
+                    user["email"],
+                    user["bio"],
+                    user["username"],
+                    user["password"],
+                    user["active"],
+                    user["type"],
+                    datetime.now(),
+                    user["id"],
+                ),
+            )
 
         db_cursor.execute(
             """
@@ -185,5 +253,140 @@ def update_user(user):
         )
 
         updated_user = db_cursor.fetchone()
+        updated_user_dict = dict(updated_user)
 
-        return json.dumps(dict(updated_user))
+        if "profile_image" in updated_user_dict:
+            del updated_user_dict["profile_image"]
+
+        return json.dumps(updated_user_dict)
+
+
+def __get_subscriptions__(user_id, db_cursor=None):
+    execution = """
+            SELECT
+                json_group_array(json_object('id', u.id, 'username', u.username)) as subscriptions
+            FROM Subscriptions s
+            JOIN Users u
+            ON s.author_id = u.id
+            WHERE s.follower_id = ?
+        """
+    if db_cursor:
+        db_cursor.execute(execution, (user_id,))
+
+    else:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            db_cursor = conn.cursor()
+
+            db_cursor.execute(
+                execution,
+                (user_id,),
+            )
+
+    subscriptions = dict(db_cursor.fetchone())
+
+    return subscriptions
+
+
+def __get_subscribers__(user_id, db_cursor=None):
+    execution = """
+        SELECT
+            json_group_array(json_object('id', u.id, 'username', u.username)) as subscribers
+        FROM Subscriptions s
+        JOIN Users u
+        ON s.follower_id = u.id
+        WHERE s.author_id = ?
+    """
+
+    if db_cursor:
+        db_cursor.execute(execution, (user_id,))
+
+    else:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            db_cursor = conn.cursor()
+
+            db_cursor.execute(
+                execution,
+                (user_id,),
+            )
+
+    subscribers = dict(db_cursor.fetchone())
+
+    return subscribers
+
+
+def add_subscription(user_id, sub_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        # Check if subscription already exists
+        db_cursor.execute(
+            """
+            SELECT s.id FROM Subscriptions s
+            WHERE s.author_id = ?
+            AND s.follower_id = ?
+            """,
+            (sub_id, user_id),
+        )
+
+        existing = db_cursor.fetchone()
+
+        if existing:
+            # Return existing subscription
+            subscription_id = existing["id"]
+        else:
+            # Create new subscription
+            db_cursor.execute(
+                """
+                INSERT INTO Subscriptions (follower_id, author_id, created_on)
+                VALUES (?, ?, ?)    
+                """,
+                (user_id, sub_id, datetime.now()),
+            )
+            subscription_id = db_cursor.lastrowid
+
+        db_cursor.execute(
+            """
+            SELECT u.id, u.username FROM Subscriptions s
+            JOIN Users u
+            ON u.id = s.follower_id
+            WHERE s.id = ?
+            """,
+            (subscription_id,),
+        )
+
+        subscription = db_cursor.fetchone()
+
+        return json.dumps(dict(subscription))
+
+
+def delete_subscription(user_id, sub_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            DELETE FROM Subscriptions
+            WHERE follower_id = ?
+            AND author_id = ?
+            """,
+            (
+                user_id,
+                sub_id,
+            ),
+        )
+
+        return json.dumps({"deleted": "true"})
+
+
+# views/user.py
+def get_user_profile_image(user_id):
+    """Returns only the profile image blob"""
+    with sqlite3.connect(DB_PATH) as conn:
+        db_cursor = conn.cursor()
+        db_cursor.execute("SELECT profile_image FROM Users WHERE id = ?", (user_id,))
+        result = db_cursor.fetchone()
+        return result[0] if result and result[0] else None
