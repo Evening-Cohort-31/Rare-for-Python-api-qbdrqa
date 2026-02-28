@@ -1,3 +1,9 @@
+"""
+user.py
+
+This module provides CRUD functions for the Users table
+"""
+
 import sqlite3
 import json
 from datetime import datetime
@@ -13,8 +19,8 @@ def login_user(user):
         user (dict): Contains the username and password of the user trying to login
 
     Returns:
-        json string: If the user was found will return valid boolean of True and the user's id as the token
-                     If the user was not found will return valid boolean False
+        json string: If user, returns True and the user's id as the token
+                     If no user found, returns False
     """
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -65,7 +71,21 @@ def create_user(user):
 
         db_cursor.execute(
             """
-        Insert into Users (first_name, last_name, username, email, password, bio, profile_image, created_on, active, type, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?,?)
+        Insert into Users 
+        (
+            first_name, 
+            last_name, 
+            username, 
+            email, 
+            password, 
+            bio, 
+            profile_image, 
+            created_on, 
+            active, 
+            type, 
+            updated_at
+        ) 
+        values (?, ?, ?, ?, ?, ?, ?, ?, 1, ?,?)
         """,
             (
                 user["first_name"],
@@ -81,9 +101,9 @@ def create_user(user):
             ),
         )
 
-        id = db_cursor.lastrowid
+        user_id = db_cursor.lastrowid
 
-        return json.dumps({"token": id, "valid": True})
+        return json.dumps({"token": user_id, "valid": True})
 
 
 def list_users():
@@ -92,7 +112,7 @@ def list_users():
     Returns:
         json string: A list of all users
     """
-    with sqlite3.connect("./db.sqlite3") as conn:
+    with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
@@ -152,6 +172,7 @@ def list_users():
 
 
 def get_user(user_id):
+    """Returns the specified user"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -170,7 +191,11 @@ def get_user(user_id):
             (user_id,),
         )
 
-        user = dict(db_cursor.fetchone())
+        row = db_cursor.fetchone()
+        if row is None:
+            return json.dumps({})
+
+        user = dict(row)
 
         if "profile_image" in user:
             del user["profile_image"]
@@ -188,6 +213,7 @@ def get_user(user_id):
 
 
 def update_user(user):
+    """Updates the specified user"""
     try:
         with sqlite3.connect(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
@@ -392,6 +418,7 @@ def __get_subscribers__(user_id, db_cursor=None):
 
 
 def add_subscription(user_id, sub_id):
+    """Creates a new subscription"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -438,6 +465,7 @@ def add_subscription(user_id, sub_id):
 
 
 def delete_subscription(user_id, sub_id):
+    """Deletes a subscription"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -454,10 +482,9 @@ def delete_subscription(user_id, sub_id):
             ),
         )
 
-        return json.dumps({"deleted": "true"})
+        return json.dumps({"deleted": True})
 
 
-# views/user.py
 def get_user_profile_image(user_id):
     """Returns only the profile image blob"""
     with sqlite3.connect(DB_PATH) as conn:

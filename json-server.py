@@ -10,6 +10,7 @@ from views.comment import (
     get_comments_by_post_id,
     update_comment,
     get_comment_by_id,
+    delete_comment
 )
 
 from views.post import (
@@ -24,6 +25,7 @@ from views.post import (
     search_posts_by_title,
     delete_post,
     get_subscribed_posts,
+    get_post_header_image
 )
 
 from views.user import (
@@ -43,22 +45,31 @@ from views.tag import get_tags, get_tag_by_id, create_tag
 class JSONServer(HandleRequests):
     """Server class to handle incoming HTTP requests"""
 
+    def _respond_single_resource(self, response_body):
+        """Responds with 404 when a single-resource payload is empty"""
+        try:
+            parsed = json.loads(response_body)
+        except (TypeError, ValueError):
+            parsed = None
+
+        if parsed in ({}, None):
+            return self.response(
+                response_body, status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
+            )
+
+        return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
     def do_GET(self):
         """Handle GET requests from a client"""
         url = self.parse_url(self.path)
         query_params = url["query_params"]
         response_body = ""
 
-        if url["requested_resource"] == "user":
-            return self.response(
-                "{}", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
-            )
-
         if url["requested_resource"] == "users":
             # /users or /users/<id>
             if url["pk"] != 0:
                 response_body = get_user(url["pk"])
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+                return self._respond_single_resource(response_body)
             if "image" in query_params:
                 user_id = query_params["image"][0]
                 image_data = get_user_profile_image(user_id)
@@ -98,7 +109,7 @@ class JSONServer(HandleRequests):
                     response_body = get_subscribed_posts(url["pk"])
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
                 response_body = get_post_by_id(url["pk"])
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+                return self._respond_single_resource(response_body)
 
             # /posts?user_id=#
             if "user_id" in query_params:
@@ -123,6 +134,32 @@ class JSONServer(HandleRequests):
                 response_body = search_posts_by_title(search_term)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
+            if "image" in query_params:
+                post_id = query_params["image"][0]
+                image_data = get_post_header_image(post_id)
+                if image_data:
+                    try:
+                        # Detect actual image type
+                        image_type = imghdr.what(None, h=image_data)
+                        content_type = (
+                            f"image/{image_type}" if image_type else "image/jpeg"
+                        )
+
+                        self.send_response(200)
+                        self.send_header("Content-Type", content_type)
+                        self.send_header("Content-Length", str(len(image_data)))
+                        self.send_header("Cache-Control", "max-age=86400")
+                        self.send_header("Access-Control-Allow-Origin", "*")
+                        self.end_headers()
+                        self.wfile.write(image_data)
+                    except (BrokenPipeError, ConnectionResetError):
+                        pass
+                else:
+                    # Send 404 with no body to avoid ORB blocking
+                    self.send_response(404)
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                return
             response_body = get_all_posts()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
@@ -130,7 +167,7 @@ class JSONServer(HandleRequests):
             # /tags or /tags/<id>
             if url["pk"] != 0:
                 response_body = get_tag_by_id(url["pk"])
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+                return self._respond_single_resource(response_body)
 
             response_body = get_tags()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
@@ -139,7 +176,7 @@ class JSONServer(HandleRequests):
             # /categories or /categories/<id>
             if url["pk"] != 0:
                 response_body = get_category_by_id(url["pk"])
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+                return self._respond_single_resource(response_body)
 
             response_body = get_all_categories()
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
@@ -147,7 +184,7 @@ class JSONServer(HandleRequests):
         if url["requested_resource"] == "comments":
             if url["pk"] != 0:
                 response_body = get_comment_by_id(url["pk"])
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+                return self._respond_single_resource(response_body)
             if "post_id" in query_params:
                 post_id = query_params["post_id"][0]
                 response_body = get_comments_by_post_id(post_id)
@@ -171,6 +208,9 @@ class JSONServer(HandleRequests):
                         url["pk"], query_params["sub_id"][0]
                     )
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
+        if url["requested_resource"] == "comments" and url['pk'] != 0:
+            response_body = delete_comment(url["pk"])
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
         return self.response(
             "Not found", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
         )
@@ -251,7 +291,7 @@ class JSONServer(HandleRequests):
 
             response_body = update_post(request_body)
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
-        
+
         if url["requested_resource"] == "users":
             if pk != 0:
                 response_body = update_user(request_body)
@@ -265,6 +305,7 @@ class JSONServer(HandleRequests):
             "Requested resource not found",
             status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value,
         )
+
 
 def main():
     host = ""
