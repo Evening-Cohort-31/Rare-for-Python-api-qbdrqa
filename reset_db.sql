@@ -343,14 +343,14 @@ VALUES
 
 -- Run This to Add profile_image blobs
 ALTER TABLE Users
-ADD COLUMN profile_image BLOB
+ADD COLUMN profile_image BLOB;
 
 ALTER TABLE Posts
-ADD COLUMN image BLOB
+ADD COLUMN image BLOB;
 
 UPDATE Posts
 SET approved = 1
-WHERE approved = 'true'
+WHERE approved = 'true';
 
 ALTER TABLE Users
 ADD COLUMN updated_at date;
@@ -361,8 +361,8 @@ ADD COLUMN updated_at date;
 
 UPDATE Users
 SET updated_at = created_on
-WHERE updated_at IS NULL
+WHERE updated_at IS NULL;
 
 UPDATE Posts
 SET updated_at = publication_date
-WHERE updated_at IS NULL
+WHERE updated_at IS NULL;
