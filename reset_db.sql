@@ -365,4 +365,5 @@ WHERE updated_at IS NULL;
 
 UPDATE Posts
 SET updated_at = publication_date
-WHERE updated_at IS NULL;
+
+WHERE updated_at IS NULL

@@ -1,3 +1,9 @@
+"""
+post.py
+
+This module provides CRUD functions for the Posts table
+"""
+
 import sqlite3
 import json
 from datetime import datetime
@@ -7,6 +13,7 @@ DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
 
 def _fetch_related_data_for_posts(db_cursor, post_ids):
+    """Returns comments, tags, and reactions for the provided posts"""
     if not post_ids:
         return {}, {}, {}
 
@@ -85,6 +92,7 @@ def _fetch_related_data_for_posts(db_cursor, post_ids):
 
 
 def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_post):
+    """Attaches the provided tags, comments, and reactions to their related Posts entries"""
     for post in posts:
         if isinstance(post.get("user"), str):
             post["user"] = json.loads(post["user"])
@@ -99,6 +107,8 @@ def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_pos
 
 
 def update_post_tags(post_id, tag_ids, db_cursor=None):
+    """Updates the PostTags table for the provided post"""
+
     def _update_tags(cursor):
         cursor.execute(
             """
@@ -125,6 +135,7 @@ def update_post_tags(post_id, tag_ids, db_cursor=None):
 
 
 def create_post(post):
+    """Creates a new post"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -142,7 +153,16 @@ def create_post(post):
         db_cursor.execute(
             """
             INSERT into Posts
-                (user_id, category_id, title, publication_date, image, content, approved, updated_at)
+            (
+                user_id, 
+                category_id, 
+                title, 
+                publication_date, 
+                image, 
+                content, 
+                approved, 
+                updated_at
+            )
             VALUES
                 (?, ?, ?, ?, ?, ?, ?,?)
             """,
@@ -172,6 +192,7 @@ def create_post(post):
 
 
 def get_all_posts():
+    """Returns all approved posts of active users"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -206,6 +227,7 @@ def get_all_posts():
 
 
 def get_user_posts(user_id):
+    """Returns all approved posts for the provided user"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -240,6 +262,7 @@ def get_user_posts(user_id):
 
 
 def get_post_by_id(post_id, cursor=None):
+    """Returns the specified post"""
     execution = """
     SELECT
         p.id, p.title, p.content, p.approved,
@@ -280,6 +303,7 @@ def get_post_by_id(post_id, cursor=None):
 
 
 def get_post_details(post_id):
+    """Returns an approved posts with user info"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -318,6 +342,7 @@ def get_post_details(post_id):
 
 
 def update_post(post):
+    """Updates a post"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -333,9 +358,6 @@ def update_post(post):
         if has_new_image:
             if isinstance(post["image"], bytes):
                 blob_data = post["image"]
-            else:
-                with open(post["image"], "rb") as file:
-                    blob_data = file.read()
 
         # Build UPDATE query conditionally based on whether image is provided
         if has_new_image:
@@ -390,6 +412,7 @@ def update_post(post):
 
 
 def get_post_title(post_id):
+    """Returns the title of the provided post"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -404,6 +427,7 @@ def get_post_title(post_id):
 
 
 def get_unapproved_posts():
+    """Returns all unapproved posts"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -437,6 +461,7 @@ def get_unapproved_posts():
 
 
 def approve_post(post_id):
+    """Approves the specified post"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -449,6 +474,11 @@ def approve_post(post_id):
         )
 
         db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
+        row = db_cursor.fetchone()
+        if row is None:
+            return json.dumps({})
+
+        approved_post = dict(row)
 
         approved_post = dict(db_cursor.fetchone())
 
@@ -459,6 +489,7 @@ def approve_post(post_id):
 
 
 def get_posts_by_tag_id(tag_id):
+    """Returns all approved posts with the provided tag"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -496,6 +527,7 @@ def get_posts_by_tag_id(tag_id):
 
 
 def search_posts_by_title(search_term):
+    """Returns any posts with the provided term in it's title"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -533,6 +565,7 @@ def search_posts_by_title(search_term):
 
 
 def delete_post(post_id):
+    """Deletes the specified post"""
     with sqlite3.connect(DB_PATH) as conn:
         db_cursor = conn.cursor()
         db_cursor.execute("DELETE FROM PostTags WHERE post_id = ?", (post_id,))
@@ -555,6 +588,7 @@ def add_reaction(post_id, user_id, reaction_id):
 
 
 def get_subscribed_posts(user_id):
+    """ "Returns a list of all approved posts of users the provided user is subscribed to."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()

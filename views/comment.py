@@ -1,3 +1,9 @@
+"""
+comment.py
+
+This module provides CRUD functions for the Comments table
+"""
+
 import sqlite3
 import json
 from datetime import datetime
@@ -7,6 +13,7 @@ DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
 
 def create_comment(comment):
+    """Creates a new comment"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -36,6 +43,7 @@ def create_comment(comment):
                 c.content,
                 c.created_on,
                 u.first_name || ' ' || u.last_name AS author_display_name,
+                u.username,
                 u.id AS author_id
             FROM Comments c
             JOIN Users u ON u.id = c.author_id
@@ -49,6 +57,7 @@ def create_comment(comment):
 
 
 def get_comments_by_post_id(post_id):
+    """Returns a list of all comment for the post with the provided id"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -75,6 +84,7 @@ def get_comments_by_post_id(post_id):
 
 
 def get_comment_by_id(comment_id):
+    """Returns the comment with the provided id"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -101,6 +111,7 @@ def get_comment_by_id(comment_id):
 
 
 def update_comment(comment_id, comment):
+    """Updates the specified comment"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
@@ -122,6 +133,7 @@ def update_comment(comment_id, comment):
 
 
 def delete_comment(comment_id):
+    """Deletes the specified comment"""
     with sqlite3.connect(DB_PATH) as conn:
         db_cursor = conn.cursor()
 
@@ -133,4 +145,4 @@ def delete_comment(comment_id):
             (comment_id,),
         )
 
-    return True
+    return json.dumps({"deleted": True})
