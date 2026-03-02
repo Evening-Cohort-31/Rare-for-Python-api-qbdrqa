@@ -4,7 +4,6 @@ import imghdr
 from http.server import ThreadingHTTPServer
 from nss_handler import HandleRequests, status
 
-
 from views.comment import (
     create_comment,
     get_comments_by_post_id,
@@ -24,6 +23,7 @@ from views.post import (
     approve_post,
     search_posts_by_title,
     delete_post,
+    add_reaction,
     get_subscribed_posts,
     get_post_header_image
 )
@@ -241,6 +241,13 @@ class JSONServer(HandleRequests):
 
         if url["requested_resource"] == "comments":
             response_body = create_comment(request_body)
+            return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
+        if url["requested_resource"] == "postReactions":
+            response_body = add_reaction(
+                request_body["post_id"],
+                request_body["user_id"],
+                request_body["reaction_id"],
+            )
             return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
         if url["requested_resource"] in ("new_post", "post", "posts"):

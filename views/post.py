@@ -480,6 +480,8 @@ def approve_post(post_id):
 
         approved_post = dict(row)
 
+        approved_post = dict(db_cursor.fetchone())
+
         if "image" in approved_post:
             del approved_post["image"]
 
@@ -570,6 +572,19 @@ def delete_post(post_id):
         db_cursor.execute("DELETE FROM Comments WHERE post_id = ?", (post_id,))
         db_cursor.execute("DELETE FROM Posts WHERE id = ?", (post_id,))
         return json.dumps({"deleted": True})
+
+
+def add_reaction(post_id, user_id, reaction_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        db_cursor = conn.cursor()
+        db_cursor.execute(
+            """
+            INSERT INTO PostReactions (user_id, reaction_id, post_id)
+            VALUES (?, ?, ?)
+            """,
+            (user_id, reaction_id, post_id),
+        )
+        return json.dumps({"id": db_cursor.lastrowid})
 
 
 def get_subscribed_posts(user_id):
