@@ -78,6 +78,34 @@ def create_category(category):
         return json.dumps(dict(category)) if category else json.dumps({})
 
 
+def update_category(category_id, category):
+    """Updates the category with the provided id"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            UPDATE Categories
+            SET label = ?
+            WHERE id = ?
+            """,
+            (category["label"], category_id),
+        )
+
+        db_cursor.execute(
+            """
+            SELECT * FROM Categories
+            WHERE id = ?
+            """,
+            (category_id,),
+        )
+
+        category = db_cursor.fetchone()
+
+        return json.dumps(dict(category)) if category else json.dumps({})
+
+
 def delete_category(category_id):
     """Deletes the category with the provided id"""
     with sqlite3.connect(DB_PATH) as conn:
@@ -92,4 +120,9 @@ def delete_category(category_id):
             (category_id,),
         )
 
-        return json.dumps({"deleted": True})
+        deleted_count = db_cursor.rowcount
+
+        if deleted_count == 0:
+            return False
+
+        return True
