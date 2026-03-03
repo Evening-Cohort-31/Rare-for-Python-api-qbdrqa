@@ -25,7 +25,8 @@ from views.post import (
     delete_post,
     add_reaction,
     get_subscribed_posts,
-    get_post_header_image
+    get_post_header_image,
+    get_posts_by_category_id
 )
 
 from views.user import (
@@ -129,6 +130,11 @@ class JSONServer(HandleRequests):
                 response_body = get_posts_by_tag_id(tag_id)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
+            if "category_id" in query_params:
+                category_id = query_params["category_id"][0]
+                response_body = get_posts_by_category_id(category_id)
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+            
             if "title" in query_params:
                 search_term = query_params["title"][0]
                 response_body = search_posts_by_title(search_term)

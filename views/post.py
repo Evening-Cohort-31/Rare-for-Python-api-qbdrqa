@@ -646,3 +646,41 @@ def get_post_header_image(post_id):
         db_cursor.execute("SELECT image FROM Posts WHERE id = ?", (post_id,))
         result = db_cursor.fetchone()
         return result[0] if result and result[0] else None
+
+
+def get_posts_by_category_id(category_id):
+    """Return all posts with the given category"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT
+                p.id, p.title, p.content, p.approved,
+                p.publication_date, p.updated_at,
+                json_object(
+                    'id', u.id, 'first_name', u.first_name,
+                    'last_name', u.last_name, 'username', u.username
+                ) as user,
+                json_object('id', c.id, 'label', c.label) as category
+            FROM Posts p
+            JOIN Users u ON p.user_id = u.id
+            JOIN Categories c ON p.category_id = c.id
+            WHERE p.approved = 1
+              AND date(p.publication_date) <= date('now')
+              AND c.id = ?
+            ORDER BY date(p.publication_date) DESC
+
+            """,
+            (category_id,),
+        )
+
+        posts = [dict(row) for row in db_cursor.fetchall()]
+        post_ids = [p["id"] for p in posts]
+
+        # Fetch and attach related data
+        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
+        posts = _attach_related_data(posts, tags, comments, reactions)
+
+        return json.dumps(posts)
