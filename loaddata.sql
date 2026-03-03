@@ -302,7 +302,7 @@ VALUES (5, 7, "2025-02-23")
   WHERE follower_id = 5 AND author_id = 5
 
   DELETE FROM Subscriptions
-  WHERE id IS NOT NULL
+  WHERE id IS NOT NULL;
 
   ALTER TABLE Users
   DROP COLUMN profile_image_url;
@@ -313,17 +313,17 @@ VALUES (5, 7, "2025-02-23")
 
   UPDATE DemotionQueue
   SET approver_one_id = 4
-  WHERE approver_one_id = 16
+  WHERE approver_one_id = 16;
 
   DELETE FROM DemotionQueue
-  WHERE action = 'cancel demotion'
+  WHERE action = 'cancel demotion';
 
 
   UPDATE Posts
   SET category_id = 1
-  WHERE category_id = 'undefined'
+  WHERE category_id = 'undefined';
 
   DELETE FROM PostTags
-  WHERE id > 58
+  WHERE id > 58;
 
   UPDATE sqlite_sequence SET seq=58 WHERE name = 'PostTags'

@@ -9,7 +9,7 @@ from views.comment import (
     get_comments_by_post_id,
     update_comment,
     get_comment_by_id,
-    delete_comment
+    delete_comment,
 )
 
 from views.post import (
@@ -28,7 +28,7 @@ from views.post import (
     get_post_header_image,
     get_posts_by_category_id,
     get_reactions,
-    remove_reaction
+    remove_reaction,
 )
 
 from views.user import (
@@ -41,7 +41,13 @@ from views.user import (
     delete_subscription,
     add_subscription,
 )
-from views.category import get_all_categories, create_category, get_category_by_id
+from views.category import (
+    get_all_categories,
+    create_category,
+    get_category_by_id,
+    update_category,
+    delete_category,
+)
 from views.tag import get_tags, get_tag_by_id, create_tag
 
 
@@ -136,7 +142,7 @@ class JSONServer(HandleRequests):
                 category_id = query_params["category_id"][0]
                 response_body = get_posts_by_category_id(category_id)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
-            
+
             if "title" in query_params:
                 search_term = query_params["title"][0]
                 response_body = search_posts_by_title(search_term)
@@ -224,7 +230,13 @@ class JSONServer(HandleRequests):
                         url["pk"], query_params["sub_id"][0]
                     )
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
-        if url["requested_resource"] == "comments" and url['pk'] != 0:
+
+        if url["requested_resource"] == "categories" and url["pk"] != 0:
+            successfully_deleted = delete_category(url["pk"])
+            if successfully_deleted:
+                return self.response("", status.HTTP_204_SUCCESS_NO_RESPONSE_BODY.value)
+
+        if url["requested_resource"] == "comments" and url["pk"] != 0:
             response_body = delete_comment(url["pk"])
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
         if url["requested_resource"] == "post_reaction" and url["pk"] != 0:
@@ -332,6 +344,10 @@ class JSONServer(HandleRequests):
 
         if url["requested_resource"] == "comments" and pk != 0:
             response_body = update_comment(pk, request_body)
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
+        if url["requested_resource"] == "categories" and pk != 0:
+            response_body = update_category(pk, request_body)
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
         return self.response(

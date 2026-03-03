@@ -386,3 +386,7 @@ RENAME COLUMN image_url TO emoji;
 
 CREATE UNIQUE INDEX idx_unique_user_reaction_post 
 ON PostReactions(user_id, reaction_id, post_id);
+
+UPDATE Users
+SET type = 'admin'
+WHERE id = 16
