@@ -25,7 +25,9 @@ from .post import (
     search_posts_by_title,
     get_post_header_image,
     get_posts_by_category_id,
-    get_post_title
+    get_post_title,
+    get_reactions,
+    remove_reaction,
 )
 
 from .tag import (

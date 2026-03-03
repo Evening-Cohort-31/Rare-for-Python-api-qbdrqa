@@ -364,6 +364,20 @@ SET updated_at = created_on
 WHERE updated_at IS NULL;
 
 UPDATE Posts
-SET updated_at = publication_date
+SET updated_at = publication_date;
 
-WHERE updated_at IS NULL
+WHERE updated_at IS NULL;
+
+ALTER TABLE Reactions
+RENAME COLUMN image_url TO emoji;
+
+
+  const reactionEmojis = {
+    "happy": "😊",
+    "heart": "❤️",
+    "laugh": "😂",
+    "mind-blown": "🤯",
+    "fire": "🔥",
+    "thumbs-up": "👍",
+    "celebrate": "🎉"
+  }

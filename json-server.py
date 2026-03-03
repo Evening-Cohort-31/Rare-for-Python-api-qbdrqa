@@ -26,7 +26,9 @@ from views.post import (
     add_reaction,
     get_subscribed_posts,
     get_post_header_image,
-    get_posts_by_category_id
+    get_posts_by_category_id,
+    get_reactions,
+    remove_reaction
 )
 
 from views.user import (
@@ -196,6 +198,14 @@ class JSONServer(HandleRequests):
                 response_body = get_comments_by_post_id(post_id)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
             return self.response("[]", status.HTTP_200_SUCCESS.value)
+        
+        if url["requested_resource"] == "reactions":
+            if url["pk"] != 0:
+                pass
+            else:
+                response_body = get_reactions()
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
         return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
     def do_DELETE(self):
@@ -216,6 +226,9 @@ class JSONServer(HandleRequests):
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
         if url["requested_resource"] == "comments" and url['pk'] != 0:
             response_body = delete_comment(url["pk"])
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
+        if url["requested_resource"] == "post_reaction" and url["pk"] != 0:
+            response_body = remove_reaction(url["pk"])
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
         return self.response(
             "Not found", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value

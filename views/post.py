@@ -13,9 +13,9 @@ DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
 
 def _fetch_related_data_for_posts(db_cursor, post_ids):
-    """Returns comments, tags, and reactions for the provided posts"""
+    """Returns comments, tags, reactions, and reaction counts for the provided posts"""
     if not post_ids:
-        return {}, {}, {}
+        return {}, {}, {}, {}
 
     placeholders = ",".join("?" * len(post_ids))
 
@@ -69,7 +69,7 @@ def _fetch_related_data_for_posts(db_cursor, post_ids):
                 'last_name', u.last_name, 'username', u.username
             ) as user,
             json_object(
-                'id', r.id, 'label', r.label, 'image_url', r.image_url
+                'id', r.id, 'label', r.label, 'emoji', r.emoji
             ) as reaction
         FROM PostReactions pr
         JOIN Users u ON pr.user_id = u.id
@@ -88,11 +88,45 @@ def _fetch_related_data_for_posts(db_cursor, post_ids):
             }
         )
 
-    return tags_by_post, comments_by_post, reactions_by_post
+    # Query for reaction counts (all reactions with counts for each post)
+    # Create a UNION ALL clause for each post_id (SQLite compatible)
+    union_clauses = " UNION ALL ".join(
+        f"SELECT {post_id} as post_id" for post_id in post_ids
+    )
+    db_cursor.execute(
+        f"""
+        SELECT 
+            posts.post_id,
+            r.id as reaction_id,
+            r.label,
+            r.emoji,
+            COUNT(pr.id) as count
+        FROM ({union_clauses}) AS posts
+        CROSS JOIN Reactions r
+        LEFT JOIN PostReactions pr 
+            ON pr.post_id = posts.post_id 
+            AND pr.reaction_id = r.id
+        GROUP BY posts.post_id, r.id
+        """
+    )
+    reaction_counts_by_post = {}
+    for row in db_cursor.fetchall():
+        reaction_counts_by_post.setdefault(row["post_id"], []).append(
+            {
+                "reaction_id": row["reaction_id"],
+                "label": row["label"],
+                "emoji": row["emoji"],
+                "count": row["count"],
+            }
+        )
+
+    return tags_by_post, comments_by_post, reactions_by_post, reaction_counts_by_post
 
 
-def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_post):
-    """Attaches the provided tags, comments, and reactions to their related Posts entries"""
+def _attach_related_data(
+    posts, tags_by_post, comments_by_post, reactions_by_post, reaction_counts_by_post
+):
+    """Attaches the provided tags, comments, reactions, and reaction counts to their related Posts entries"""
     for post in posts:
         if isinstance(post.get("user"), str):
             post["user"] = json.loads(post["user"])
@@ -102,6 +136,7 @@ def _attach_related_data(posts, tags_by_post, comments_by_post, reactions_by_pos
         post["tags"] = tags_by_post.get(post["id"], [])
         post["comments"] = comments_by_post.get(post["id"], [])
         post["reactions"] = reactions_by_post.get(post["id"], [])
+        post["reaction_counts"] = reaction_counts_by_post.get(post["id"], [])
 
     return posts
 
@@ -220,8 +255,10 @@ def get_all_posts():
         posts = [dict(row) for row in db_cursor.fetchall()]
         post_ids = [p["id"] for p in posts]
 
-        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
-        posts = _attach_related_data(posts, tags, comments, reactions)
+        tags, comments, reactions, reaction_counts = _fetch_related_data_for_posts(
+            db_cursor, post_ids
+        )
+        posts = _attach_related_data(posts, tags, comments, reactions, reaction_counts)
 
         return json.dumps(posts)
 
@@ -255,8 +292,10 @@ def get_user_posts(user_id):
         posts = [dict(row) for row in db_cursor.fetchall()]
         post_ids = [p["id"] for p in posts]
 
-        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
-        posts = _attach_related_data(posts, tags, comments, reactions)
+        tags, comments, reactions, reaction_counts = _fetch_related_data_for_posts(
+            db_cursor, post_ids
+        )
+        posts = _attach_related_data(posts, tags, comments, reactions, reaction_counts)
 
         return json.dumps(posts)
 
@@ -296,8 +335,10 @@ def get_post_by_id(post_id, cursor=None):
         return json.dumps(None)
 
     posts = [dict(row)]
-    tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, [post_id])
-    posts = _attach_related_data(posts, tags, comments, reactions)
+    tags, comments, reactions, reaction_counts = _fetch_related_data_for_posts(
+        db_cursor, [post_id]
+    )
+    posts = _attach_related_data(posts, tags, comments, reactions, reaction_counts)
 
     return json.dumps(posts[0])
 
@@ -454,8 +495,10 @@ def get_unapproved_posts():
         posts = [dict(row) for row in db_cursor.fetchall()]
         post_ids = [p["id"] for p in posts]
 
-        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
-        posts = _attach_related_data(posts, tags, comments, reactions)
+        tags, comments, reactions, reaction_counts = _fetch_related_data_for_posts(
+            db_cursor, post_ids
+        )
+        posts = _attach_related_data(posts, tags, comments, reactions, reaction_counts)
 
         return json.dumps(posts)
 
@@ -521,8 +564,10 @@ def get_posts_by_tag_id(tag_id):
         post_ids = [p["id"] for p in posts]
 
         # Fetch and attach related data
-        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
-        posts = _attach_related_data(posts, tags, comments, reactions)
+        tags, comments, reactions, reaction_counts = _fetch_related_data_for_posts(
+            db_cursor, post_ids
+        )
+        posts = _attach_related_data(posts, tags, comments, reactions, reaction_counts)
 
         return json.dumps(posts)
 
@@ -559,8 +604,10 @@ def search_posts_by_title(search_term):
         post_ids = [p["id"] for p in posts]
 
         # Fetch and attach related data
-        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
-        posts = _attach_related_data(posts, tags, comments, reactions)
+        tags, comments, reactions, reaction_counts = _fetch_related_data_for_posts(
+            db_cursor, post_ids
+        )
+        posts = _attach_related_data(posts, tags, comments, reactions, reaction_counts)
 
         return json.dumps(posts)
 
@@ -577,6 +624,7 @@ def delete_post(post_id):
 
 def add_reaction(post_id, user_id, reaction_id):
     with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
         db_cursor.execute(
             """
@@ -586,6 +634,35 @@ def add_reaction(post_id, user_id, reaction_id):
             (user_id, reaction_id, post_id),
         )
         return json.dumps({"id": db_cursor.lastrowid})
+    
+def remove_reaction(post_reaction_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+        db_cursor.execute(
+            """
+            DELETE FROM PostReactions
+            WHERE id = ?
+            """, (post_reaction_id,)
+        )
+
+        return json.dumps({"deleted": True})
+
+
+def get_reactions():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT * FROM Reactions
+            """
+        )
+
+        reactions = db_cursor.fetchall()
+
+        return json.dumps([dict(row) for row in reactions])
 
 
 def get_subscribed_posts(user_id):
@@ -633,8 +710,10 @@ def get_subscribed_posts(user_id):
         posts = [dict(row) for row in db_cursor.fetchall()]
         post_ids = [p["id"] for p in posts]
 
-        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
-        posts = _attach_related_data(posts, tags, comments, reactions)
+        tags, comments, reactions, reaction_counts = _fetch_related_data_for_posts(
+            db_cursor, post_ids
+        )
+        posts = _attach_related_data(posts, tags, comments, reactions, reaction_counts)
 
         return json.dumps(posts)
 
@@ -680,7 +759,9 @@ def get_posts_by_category_id(category_id):
         post_ids = [p["id"] for p in posts]
 
         # Fetch and attach related data
-        tags, comments, reactions = _fetch_related_data_for_posts(db_cursor, post_ids)
-        posts = _attach_related_data(posts, tags, comments, reactions)
+        tags, comments, reactions, reaction_counts = _fetch_related_data_for_posts(
+            db_cursor, post_ids
+        )
+        posts = _attach_related_data(posts, tags, comments, reactions, reaction_counts)
 
         return json.dumps(posts)
