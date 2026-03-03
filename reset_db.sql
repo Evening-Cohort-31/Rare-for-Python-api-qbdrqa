@@ -367,3 +367,7 @@ UPDATE Posts
 SET updated_at = publication_date
 
 WHERE updated_at IS NULL
+
+UPDATE Users
+SET type = 'admin'
+WHERE id = 16
