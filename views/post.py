@@ -460,14 +460,15 @@ def get_unapproved_posts():
         return json.dumps(posts)
 
 
-def approve_post(post_id):
-    """Approves the specified post"""
+def approve_post(post_id, approved=True):
+    """Sets the approval status of the specified post"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
         db_cursor.execute(
-            "UPDATE POSTS SET approved = 1, updated_at = ? WHERE id = ?",
+            "UPDATE POSTS SET approved = ?, updated_at = ? WHERE id = ?",
             (
+                1 if approved else 0,
                 datetime.now(),
                 post_id,
             ),
@@ -478,14 +479,14 @@ def approve_post(post_id):
         if row is None:
             return json.dumps({})
 
-        approved_post = dict(row)
+        approved_post = get_post_by_id(post_id, db_cursor)
 
         approved_post = dict(db_cursor.fetchone())
 
         if "image" in approved_post:
             del approved_post["image"]
 
-        return json.dumps(approved_post)
+        return approved_post
 
 
 def get_posts_by_tag_id(tag_id):
