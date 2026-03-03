@@ -88,7 +88,8 @@ CREATE TABLE "PostReactions" (
   "post_id" INTEGER,
   FOREIGN KEY(`user_id`) REFERENCES `Users`(`id`),
   FOREIGN KEY(`reaction_id`) REFERENCES `Reactions`(`id`),
-  FOREIGN KEY(`post_id`) REFERENCES `Posts`(`id`)
+  FOREIGN KEY(`post_id`) REFERENCES `Posts`(`id`),
+  UNIQUE(user_id, reaction_id, post_id)
 );
 
 -- Create Tags table
@@ -381,3 +382,7 @@ RENAME COLUMN image_url TO emoji;
     "thumbs-up": "👍",
     "celebrate": "🎉"
   }
+
+
+CREATE UNIQUE INDEX idx_unique_user_reaction_post 
+ON PostReactions(user_id, reaction_id, post_id);
