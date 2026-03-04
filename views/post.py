@@ -524,8 +524,6 @@ def approve_post(post_id, approved=True):
 
         approved_post = get_post_by_id(post_id, db_cursor)
 
-        approved_post = dict(db_cursor.fetchone())
-
         if "image" in approved_post:
             del approved_post["image"]
 
