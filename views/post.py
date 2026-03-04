@@ -559,6 +559,23 @@ def submit_post(post_id):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            SELECT user_id FROM Posts p
+            WHERE p.id = ?
+            """, (post_id,)
+        )
+
+        row = dict(db_cursor.fetchone())
+
+        user_id = row["user_id"]
+
+        is_admin = check_if_admin(user_id, db_cursor)
+
+        if is_admin:
+            return approve_post(post_id, user_id)
+
         db_cursor.execute(
             """
             UPDATE Posts 
@@ -573,53 +590,47 @@ def submit_post(post_id):
             ),
         )
 
-        db_cursor.execute(
-            """
-            SELECT user_id FROM Posts
-            WHERE id = ?     
-            """,
-            (post_id,),
-        )
-
-        row = dict(db_cursor.fetchone())
-        user_id = row["user_id"]
-
         return get_post_by_id(post_id, user_id, db_cursor)
 
 
-def approve_post(post_id, reviewer_id):
+def approve_post(post_id, reviewer_id, cursor = None):
     """Approves a post for publication"""
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
-        db_cursor = conn.cursor()
-        db_cursor.execute(
-            """
-            UPDATE Posts 
-            SET status = ?, publication_date = ?, reviewed_at = ?, reviewer_id = ?, updated_at = ? 
-            WHERE id = ?
-            """,
-            (
-                "approved",
-                datetime.now(),
-                datetime.now(),
-                reviewer_id,
-                datetime.now(),
-                post_id,
-            ),
-        )
 
-        db_cursor.execute(
-            """
-            SELECT user_id FROM Posts
-            WHERE id = ?
-            """,
-            (post_id,),
-        )
+    if cursor:
+        db_cursor = cursor
+    
+    else:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            db_cursor = conn.cursor()
+            db_cursor.execute(
+                """
+                UPDATE Posts 
+                SET status = ?, publication_date = ?, reviewed_at = ?, reviewer_id = ?, updated_at = ? 
+                WHERE id = ?
+                """,
+                (
+                    "approved",
+                    datetime.now(),
+                    datetime.now(),
+                    reviewer_id,
+                    datetime.now(),
+                    post_id,
+                ),
+            )
 
-        row = dict(db_cursor.fetchone())
-        user_id = row["user_id"]
+            db_cursor.execute(
+                """
+                SELECT user_id FROM Posts
+                WHERE id = ?
+                """,
+                (post_id,),
+            )
 
-        return get_post_by_id(post_id, user_id, db_cursor)
+            row = dict(db_cursor.fetchone())
+            user_id = row["user_id"]
+
+            return get_post_by_id(post_id, user_id, db_cursor)
 
 
 def reject_post(post_id, reviewer_id, admin_comments=None):
