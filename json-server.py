@@ -21,6 +21,8 @@ from views.post import (
     get_posts_by_tag_id,
     get_unapproved_posts,
     approve_post,
+    reject_post,
+    submit_post,
     search_posts_by_title,
     delete_post,
     add_reaction,
@@ -119,19 +121,28 @@ class JSONServer(HandleRequests):
                 ):
                     response_body = get_subscribed_posts(url["pk"])
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
-                response_body = get_post_by_id(url["pk"])
-                return self._respond_single_resource(response_body)
+                
+                # Get user_id from query params (user requesting the post)
+                if "user_id" in query_params:
+                    user_id = query_params.get("user_id", [None])[0]
+                    if user_id:
+                        user_id = int(user_id)
+                    response_body = get_post_by_id(url["pk"], user_id)
+                    return self._respond_single_resource(response_body)
 
-            # /posts?user_id=#
+            # /posts?user_id=# or /posts?user_id=#&own_posts=true
             if "user_id" in query_params:
                 user_id = query_params["user_id"][0]
-                response_body = get_user_posts(user_id)
+                own_posts = (
+                    query_params.get("own_posts", ["false"])[0].lower() == "true"
+                )
+                response_body = get_user_posts(user_id, own_posts)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
-            # /posts?approved=false  (admin unapproved list)
-            if "approved" in query_params:
-                approved_value = query_params["approved"][0].lower()
-                if approved_value == "false":
+            # /posts?status=submitted  (admin review queue)
+            if "status" in query_params:
+                status_value = query_params["status"][0].lower()
+                if status_value == "submitted":
                     response_body = get_unapproved_posts()
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
@@ -206,7 +217,7 @@ class JSONServer(HandleRequests):
                 response_body = get_comments_by_post_id(post_id)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
             return self.response("[]", status.HTTP_200_SUCCESS.value)
-        
+
         if url["requested_resource"] == "reactions":
             if url["pk"] != 0:
                 pass
@@ -307,7 +318,7 @@ class JSONServer(HandleRequests):
                     return self.response(
                         response_body, status.HTTP_201_SUCCESS_CREATED.value
                     )
-                
+
         if url["requested_resource"] == "reactions":
             if url["pk"] != 0:
                 pass
@@ -316,7 +327,9 @@ class JSONServer(HandleRequests):
                 json_body = json.loads(response_body)
                 if json_body.get("ok") is False:
                     return self.response(response_body, status.HTTP_409_CONFLICT.value)
-                return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
+                return self.response(
+                    response_body, status.HTTP_201_SUCCESS_CREATED.value
+                )
 
         return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
@@ -337,17 +350,47 @@ class JSONServer(HandleRequests):
                 request_body = {}
 
         if url["requested_resource"] == "posts" and pk != 0:
-            # special admin approval route: PUT /posts/<id> with body {"approved": true|false}
-            if "approved" in request_body and len(request_body) == 1:
-                approved_value = request_body["approved"]
-                if not isinstance(approved_value, bool):
+            # special admin approval/rejection/submission routes: PUT /posts/<id> with body
+            # {"action": "approve", "reviewer_id": #} for approval
+            # {"action": "reject", "reviewer_id": #, "admin_comments": "..."} for rejection
+            # {"action": "submit"} for submission
+            if "action" in request_body:
+                action = request_body.get("action")
+
+                if action == "approve":
+                    reviewer_id = request_body.get("reviewer_id")
+                    if not reviewer_id:
+                        return self.response(
+                            json.dumps(
+                                {"error": "'reviewer_id' is required for approval"}
+                            ),
+                            status.HTTP_400_CLIENT_ERROR_BAD_REQUEST_DATA.value,
+                        )
+                    response_body = approve_post(pk, reviewer_id)
+                    return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
+                elif action == "reject":
+                    reviewer_id = request_body.get("reviewer_id")
+                    if not reviewer_id:
+                        return self.response(
+                            json.dumps(
+                                {"error": "'reviewer_id' is required for rejection"}
+                            ),
+                            status.HTTP_400_CLIENT_ERROR_BAD_REQUEST_DATA.value,
+                        )
+                    admin_comments = request_body.get("admin_comments")
+                    response_body = reject_post(pk, reviewer_id, admin_comments)
+                    return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
+                elif action == "submit":
+                    response_body = submit_post(pk)
+                    return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
+                else:
                     return self.response(
-                        json.dumps({"error": "'approved' must be a boolean"}),
+                        json.dumps({"error": f"Unknown action: {action}"}),
                         status.HTTP_400_CLIENT_ERROR_BAD_REQUEST_DATA.value,
                     )
-
-                response_body = approve_post(pk, approved_value)
-                return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
             response_body = update_post(request_body)
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
@@ -367,14 +410,13 @@ class JSONServer(HandleRequests):
         if url["requested_resource"] == "categories" and pk != 0:
             response_body = update_category(pk, request_body)
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
-        
+
         if url["requested_resource"] == "reactions" and pk != 0:
             response_body = update_reaction(request_body)
             json_body = json.loads(response_body)
             if json_body.get("ok") is False:
                 return self.response(response_body, status.HTTP_409_CONFLICT.value)
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
-
 
         return self.response(
             "Requested resource not found",

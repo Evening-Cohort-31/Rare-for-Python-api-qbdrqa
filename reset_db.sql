@@ -57,8 +57,13 @@ CREATE TABLE "Posts" (
   "publication_date" date,
   "image_url" varchar,
   "content" varchar,
-  "approved" bit,
-  FOREIGN KEY(`user_id`) REFERENCES `Users`(`id`)
+  "status" varchar DEFAULT 'draft',
+  "submitted_at" date,
+  "reviewed_at" date,
+  "reviewer_id" INTEGER,
+  "admin_comments" varchar,
+  FOREIGN KEY(`user_id`) REFERENCES `Users`(`id`),
+  FOREIGN KEY(`reviewer_id`) REFERENCES `Users`(`id`)
 );
 
 -- Create Comments table
@@ -181,33 +186,33 @@ VALUES
 ('Steve', 'Lewis', 'steve@example.com', 'Tech lead with passion for mentoring', 'stevel', 'password123', 'https://example.com/users/steve.jpg', '2024-03-10', 1, 'admin');
 
 -- Seed Posts (25 posts with variety of content)
-INSERT INTO Posts ('user_id', 'category_id', 'title', 'publication_date', 'image_url', 'content', 'approved') 
+INSERT INTO Posts ('user_id', 'category_id', 'title', 'publication_date', 'image_url', 'content', 'status') 
 VALUES 
-(1, 1, 'Getting Started with Python', '2025-01-15', 'https://example.com/posts/python.jpg', 'Python is a great language for beginners. In this post, we will explore the fundamentals of Python programming including variables, data types, and control structures. Perfect for those starting their coding journey!', 1),
-(1, 4, 'My Side Project Journey', '2025-01-20', 'https://example.com/posts/project.jpg', 'Here is how I built my first web app from scratch. It took 3 months of evening work, but the learning experience was invaluable. I will share my tech stack, challenges faced, and lessons learned.', 1),
-(2, 1, 'React Best Practices 2025', '2025-01-25', 'https://example.com/posts/react.jpg', 'Learn the best practices for React development in 2025. We will cover component composition, state management, performance optimization, and more.', 1),
-(2, 3, 'Coding Memes That Made Me Laugh', '2025-02-01', 'https://example.com/posts/memes.jpg', 'Here are my favorite coding memes from last month. Sometimes you need a good laugh during debugging sessions!', 1),
-(4, 1, 'CSS Grid vs Flexbox: When to Use Each', '2025-02-05', 'https://example.com/posts/css.jpg', 'Understanding when to use CSS Grid and when to use Flexbox can be confusing. This comprehensive guide will help you choose the right tool for your layout needs.', 1),
-(5, 2, 'Building a CI/CD Pipeline from Scratch', '2025-02-08', 'https://example.com/posts/cicd.jpg', 'Step-by-step guide to setting up a complete CI/CD pipeline using GitHub Actions and Docker. Automate your deployments and improve your development workflow.', 1),
-(1, 1, 'Advanced SQL Queries Explained', '2025-02-10', 'https://example.com/posts/sql.jpg', 'Master complex SQL queries with these tips and examples. We will cover joins, subqueries, CTEs, and window functions.', 1),
-(6, 1, 'Django vs Flask: Which to Choose?', '2025-02-12', 'https://example.com/posts/django-flask.jpg', 'A detailed comparison of Django and Flask frameworks. Learn the pros and cons of each to make an informed decision for your next project.', 1),
-(7, 1, 'API Security Best Practices', '2025-02-14', 'https://example.com/posts/security.jpg', 'Secure your APIs with these essential practices. Topics include authentication, authorization, rate limiting, and input validation.', 1),
-(8, 4, 'How to Write Better Documentation', '2025-02-16', 'https://example.com/posts/docs.jpg', 'Good documentation is crucial for project success. Here are my tips for writing clear, comprehensive documentation that developers will actually read.', 1),
-(9, 1, 'Introduction to Docker Containers', '2025-02-18', 'https://example.com/posts/docker.jpg', 'Docker has revolutionized application deployment. This tutorial covers the basics of containerization and how to get started with Docker.', 1),
-(10, 5, 'The Future of Web Development', '2025-02-20', 'https://example.com/posts/future-web.jpg', 'My thoughts on where web development is heading. From WebAssembly to edge computing, the landscape is constantly evolving.', 1),
-(11, 4, 'Building RESTful APIs with Node.js', '2025-02-22', 'https://example.com/posts/rest-api.jpg', 'Complete guide to building scalable RESTful APIs using Node.js and Express. Includes code examples and best practices.', 1),
-(12, 3, 'My Favorite VS Code Extensions', '2025-02-23', 'https://example.com/posts/vscode.jpg', 'Here are the VS Code extensions I cannot live without. They have boosted my productivity significantly!', 1),
-(13, 8, 'Git Tips Every Developer Should Know', '2025-02-24', 'https://example.com/posts/git.jpg', 'Essential Git commands and workflows that will make your life easier. From rebasing to cherry-picking, we cover it all.', 1),
-(14, 2, 'Transitioning from Junior to Senior Developer', '2025-02-24', 'https://example.com/posts/career.jpg', 'What it takes to grow from junior to senior developer. Technical skills are important, but soft skills matter too.', 1),
-(2, 7, 'React Query: A Deep Dive', '2025-02-25', 'https://example.com/posts/react-query.jpg', 'React Query has changed how I handle server state in React applications. Here is everything you need to know about this powerful library.', 1),
-(4, 1, 'TypeScript Tips for Beginners', '2025-02-25', 'https://example.com/posts/typescript.jpg', 'TypeScript can seem intimidating at first. These practical tips will help you get comfortable with type safety in your JavaScript projects.', 1),
-(6, 8, '10 JavaScript Array Methods You Should Know', '2025-02-26', 'https://example.com/posts/array-methods.jpg', 'JavaScript array methods are powerful tools. Master these 10 methods to write cleaner, more efficient code.', 0),
-(7, 4, 'Building a Todo App with React Hooks', '2025-02-26', 'https://example.com/posts/todo-app.jpg', 'Complete tutorial on building a todo application using React hooks. Perfect project for learning modern React patterns.', 0),
-(8, 1, 'Understanding Async/Await in JavaScript', '2025-02-27', 'https://example.com/posts/async-await.jpg', 'Async/await makes asynchronous code easier to read and write. This guide explains how it works under the hood.', 0),
-(11, 5, 'Why I Switched to Tailwind CSS', '2025-02-27', 'https://example.com/posts/tailwind.jpg', 'My experience switching from traditional CSS to Tailwind. The utility-first approach has transformed my development workflow.', 0),
-(13, 2, 'Negotiating Your First Tech Job Offer', '2025-02-28', 'https://example.com/posts/negotiation.jpg', 'Tips for negotiating salary and benefits in the tech industry. Know your worth and do not be afraid to ask for what you deserve.', 1),
-(14, 4, 'Introduction to GraphQL', '2025-03-01', 'https://example.com/posts/graphql.jpg', 'GraphQL is an alternative to REST that gives clients more control. Learn the basics and see if it is right for your project.', 1),
-(15, 8, 'Debugging Tips That Actually Work', '2025-03-02', 'https://example.com/posts/debugging.jpg', 'Debugging can be frustrating. These proven techniques will help you find and fix bugs faster.', 1);
+(1, 1, 'Getting Started with Python', '2025-01-15', 'https://example.com/posts/python.jpg', 'Python is a great language for beginners. In this post, we will explore the fundamentals of Python programming including variables, data types, and control structures. Perfect for those starting their coding journey!', 'approved'),
+(1, 4, 'My Side Project Journey', '2025-01-20', 'https://example.com/posts/project.jpg', 'Here is how I built my first web app from scratch. It took 3 months of evening work, but the learning experience was invaluable. I will share my tech stack, challenges faced, and lessons learned.', 'approved'),
+(2, 1, 'React Best Practices 2025', '2025-01-25', 'https://example.com/posts/react.jpg', 'Learn the best practices for React development in 2025. We will cover component composition, state management, performance optimization, and more.', 'approved'),
+(2, 3, 'Coding Memes That Made Me Laugh', '2025-02-01', 'https://example.com/posts/memes.jpg', 'Here are my favorite coding memes from last month. Sometimes you need a good laugh during debugging sessions!', 'approved'),
+(4, 1, 'CSS Grid vs Flexbox: When to Use Each', '2025-02-05', 'https://example.com/posts/css.jpg', 'Understanding when to use CSS Grid and when to use Flexbox can be confusing. This comprehensive guide will help you choose the right tool for your layout needs.', 'approved'),
+(5, 2, 'Building a CI/CD Pipeline from Scratch', '2025-02-08', 'https://example.com/posts/cicd.jpg', 'Step-by-step guide to setting up a complete CI/CD pipeline using GitHub Actions and Docker. Automate your deployments and improve your development workflow.', 'approved'),
+(1, 1, 'Advanced SQL Queries Explained', '2025-02-10', 'https://example.com/posts/sql.jpg', 'Master complex SQL queries with these tips and examples. We will cover joins, subqueries, CTEs, and window functions.', 'approved'),
+(6, 1, 'Django vs Flask: Which to Choose?', '2025-02-12', 'https://example.com/posts/django-flask.jpg', 'A detailed comparison of Django and Flask frameworks. Learn the pros and cons of each to make an informed decision for your next project.', 'approved'),
+(7, 1, 'API Security Best Practices', '2025-02-14', 'https://example.com/posts/security.jpg', 'Secure your APIs with these essential practices. Topics include authentication, authorization, rate limiting, and input validation.', 'approved'),
+(8, 4, 'How to Write Better Documentation', '2025-02-16', 'https://example.com/posts/docs.jpg', 'Good documentation is crucial for project success. Here are my tips for writing clear, comprehensive documentation that developers will actually read.', 'approved'),
+(9, 1, 'Introduction to Docker Containers', '2025-02-18', 'https://example.com/posts/docker.jpg', 'Docker has revolutionized application deployment. This tutorial covers the basics of containerization and how to get started with Docker.', 'approved'),
+(10, 5, 'The Future of Web Development', '2025-02-20', 'https://example.com/posts/future-web.jpg', 'My thoughts on where web development is heading. From WebAssembly to edge computing, the landscape is constantly evolving.', 'approved'),
+(11, 4, 'Building RESTful APIs with Node.js', '2025-02-22', 'https://example.com/posts/rest-api.jpg', 'Complete guide to building scalable RESTful APIs using Node.js and Express. Includes code examples and best practices.', 'approved'),
+(12, 3, 'My Favorite VS Code Extensions', '2025-02-23', 'https://example.com/posts/vscode.jpg', 'Here are the VS Code extensions I cannot live without. They have boosted my productivity significantly!', 'approved'),
+(13, 8, 'Git Tips Every Developer Should Know', '2025-02-24', 'https://example.com/posts/git.jpg', 'Essential Git commands and workflows that will make your life easier. From rebasing to cherry-picking, we cover it all.', 'approved'),
+(14, 2, 'Transitioning from Junior to Senior Developer', '2025-02-24', 'https://example.com/posts/career.jpg', 'What it takes to grow from junior to senior developer. Technical skills are important, but soft skills matter too.', 'approved'),
+(2, 7, 'React Query: A Deep Dive', '2025-02-25', 'https://example.com/posts/react-query.jpg', 'React Query has changed how I handle server state in React applications. Here is everything you need to know about this powerful library.', 'approved'),
+(4, 1, 'TypeScript Tips for Beginners', '2025-02-25', 'https://example.com/posts/typescript.jpg', 'TypeScript can seem intimidating at first. These practical tips will help you get comfortable with type safety in your JavaScript projects.', 'approved'),
+(6, 8, '10 JavaScript Array Methods You Should Know', NULL, 'https://example.com/posts/array-methods.jpg', 'JavaScript array methods are powerful tools. Master these 10 methods to write cleaner, more efficient code.', 'submitted'),
+(7, 4, 'Building a Todo App with React Hooks', NULL, 'https://example.com/posts/todo-app.jpg', 'Complete tutorial on building a todo application using React hooks. Perfect project for learning modern React patterns.', 'submitted'),
+(8, 1, 'Understanding Async/Await in JavaScript', NULL, 'https://example.com/posts/async-await.jpg', 'Async/await makes asynchronous code easier to read and write. This guide explains how it works under the hood.', 'submitted'),
+(11, 5, 'Why I Switched to Tailwind CSS', NULL, 'https://example.com/posts/tailwind.jpg', 'My experience switching from traditional CSS to Tailwind. The utility-first approach has transformed my development workflow.', 'submitted'),
+(13, 2, 'Negotiating Your First Tech Job Offer', '2025-02-28', 'https://example.com/posts/negotiation.jpg', 'Tips for negotiating salary and benefits in the tech industry. Know your worth and do not be afraid to ask for what you deserve.', 'approved'),
+(14, 4, 'Introduction to GraphQL', '2025-03-01', 'https://example.com/posts/graphql.jpg', 'GraphQL is an alternative to REST that gives clients more control. Learn the basics and see if it is right for your project.', 'approved'),
+(15, 8, 'Debugging Tips That Actually Work', '2025-03-02', 'https://example.com/posts/debugging.jpg', 'Debugging can be frustrating. These proven techniques will help you find and fix bugs faster.', 'approved');
 
 -- Seed Comments (40 comments across various posts)
 INSERT INTO Comments ('post_id', 'author_id', 'content', 'subject', 'created_on') 
@@ -349,9 +354,8 @@ ADD COLUMN profile_image BLOB;
 ALTER TABLE Posts
 ADD COLUMN image BLOB;
 
-UPDATE Posts
-SET approved = 1
-WHERE approved = 'true';
+ALTER TABLE Posts
+DROP COLUMN image_url
 
 ALTER TABLE Users
 ADD COLUMN updated_at date;

@@ -9,6 +9,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from views.user import check_if_admin
+
 DB_PATH = Path(__file__).resolve().parent.parent / "db.sqlite3"
 
 
@@ -195,20 +197,20 @@ def create_post(post):
                 publication_date, 
                 image, 
                 content, 
-                approved, 
+                status, 
                 updated_at
             )
             VALUES
-                (?, ?, ?, ?, ?, ?, ?,?)
+                (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 post["user_id"],
                 post["category_id"],
                 post["title"],
-                datetime.now(),
+                None,  # publication_date set when approved
                 blob_data,
                 post["content"],
-                post["approved"],
+                post.get("status", "draft"),  # default to 'draft'
                 datetime.now(),
             ),
         )
@@ -221,7 +223,7 @@ def create_post(post):
                 tag_ids = [t["id"] for t in tag_ids]
             update_post_tags(post_id, tag_ids, db_cursor)
 
-        new_post = get_post_by_id(post_id, db_cursor)
+        new_post = get_post_by_id(post_id, post["user_id"], db_cursor)
 
         return new_post
 
@@ -235,7 +237,7 @@ def get_all_posts():
         db_cursor.execute(
             """
             SELECT
-                p.id, p.title, p.content, p.approved,
+                p.id, p.title, p.content, p.status,
                 p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
@@ -245,7 +247,7 @@ def get_all_posts():
             FROM Posts p
             JOIN Users u ON p.user_id = u.id
             JOIN Categories c ON p.category_id = c.id
-            WHERE p.approved = 1
+            WHERE p.status = 'approved'
               AND date(p.publication_date) <= date('now')
               AND u.active = 1
             ORDER BY date(p.publication_date) DESC
@@ -263,31 +265,54 @@ def get_all_posts():
         return json.dumps(posts)
 
 
-def get_user_posts(user_id):
-    """Returns all approved posts for the provided user"""
+def get_user_posts(user_id, own_posts=False):
+    """Returns posts for the provided user. If own_posts=True, returns all posts regardless of status. Otherwise returns only approved posts."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
-        db_cursor.execute(
-            """
-            SELECT
-                p.id, p.title, p.content, p.approved,
-                p.publication_date, p.updated_at,
-                json_object(
-                    'id', u.id, 'first_name', u.first_name,
-                    'last_name', u.last_name, 'username', u.username
-                ) as user,
-                json_object('id', c.id, 'label', c.label) as category
-            FROM Posts p
-            JOIN Users u ON p.user_id = u.id
-            JOIN Categories c ON p.category_id = c.id
-            WHERE p.user_id = ?
-            AND p.approved = 1
-            ORDER BY date(p.publication_date) DESC
-            """,
-            (user_id,),
-        )
+        if not own_posts:
+            # Viewing someone else's profile - only show approved posts from active users
+            db_cursor.execute(
+                """
+                SELECT
+                    p.id, p.title, p.content, p.status,
+                    p.publication_date, p.updated_at,
+                    json_object(
+                        'id', u.id, 'first_name', u.first_name,
+                        'last_name', u.last_name, 'username', u.username
+                    ) as user,
+                    json_object('id', c.id, 'label', c.label) as category
+                FROM Posts p
+                JOIN Users u ON p.user_id = u.id
+                JOIN Categories c ON p.category_id = c.id
+                WHERE p.user_id = ?
+                AND p.status = 'approved'
+                AND u.active = 1
+                ORDER BY date(p.publication_date) DESC
+                """,
+                (user_id,),
+            )
+        else:
+            # "My Posts" - show all posts regardless of status
+            db_cursor.execute(
+                """
+                SELECT
+                    p.id, p.title, p.content, p.status,
+                    p.publication_date, p.updated_at,
+                    json_object(
+                        'id', u.id, 'first_name', u.first_name,
+                        'last_name', u.last_name, 'username', u.username
+                    ) as user,
+                    json_object('id', c.id, 'label', c.label) as category
+                FROM Posts p
+                JOIN Users u ON p.user_id = u.id
+                JOIN Categories c ON p.category_id = c.id
+                WHERE p.user_id = ?
+                ORDER BY p.updated_at DESC
+                """,
+                (user_id,),
+            )
 
         posts = [dict(row) for row in db_cursor.fetchall()]
         post_ids = [p["id"] for p in posts]
@@ -300,11 +325,12 @@ def get_user_posts(user_id):
         return json.dumps(posts)
 
 
-def get_post_by_id(post_id, cursor=None):
-    """Returns the specified post"""
+def get_post_by_id(post_id, user_id, cursor=None):
+    """Returns the specified post. If cursor is provided (internal call), returns post regardless of status. Otherwise, returns post only if user owns it OR it's approved."""
+
     execution = """
     SELECT
-        p.id, p.title, p.content, p.approved,
+        p.id, p.title, p.content, p.status, p.user_id,
         p.publication_date, p.updated_at,
         json_object(
             'id', u.id, 'first_name', u.first_name,
@@ -315,6 +341,7 @@ def get_post_by_id(post_id, cursor=None):
     JOIN Users u ON p.user_id = u.id
     JOIN Categories c ON p.category_id = c.id
     WHERE p.id = ?
+    AND u.active = 1
     """
 
     if cursor is not None:
@@ -331,8 +358,22 @@ def get_post_by_id(post_id, cursor=None):
             )
 
     row = db_cursor.fetchone()
+
     if not row:
         return json.dumps(None)
+
+    # If cursor provided (internal call), return post regardless of status
+    # Otherwise, only return if user owns it OR is admin OR post is approved
+    if cursor is None:
+        post_user_id = row["user_id"]
+        post_status = row["status"]
+        is_admin = check_if_admin(user_id, db_cursor)
+
+        # If no user_id provided (anonymous) OR (user doesn't own the post AND not admin), only return if approved
+        if (
+            user_id is None or (post_user_id != user_id and not is_admin)
+        ) and post_status != "approved":
+            return json.dumps(None)
 
     posts = [dict(row)]
     tags, comments, reactions, reaction_counts = _fetch_related_data_for_posts(
@@ -361,7 +402,7 @@ def get_post_details(post_id):
             FROM Posts p
             JOIN Users u ON u.id = p.user_id
             WHERE p.id = ?
-              AND p.approved = 1
+              AND p.status = 'approved'
               AND date(p.publication_date) <= date('now')
             """,
             (post_id,),
@@ -449,7 +490,17 @@ def update_post(post):
                 tag_ids = [t["id"] for t in tag_ids]
             update_post_tags(post["id"], tag_ids, db_cursor)
 
-        return get_post_by_id(post["id"], db_cursor)
+        # Get user_id from the database
+        db_cursor.execute(
+            """
+            SELECT user_id FROM Posts WHERE id = ?
+            """,
+            (post["id"],),
+        )
+        row = db_cursor.fetchone()
+        user_id = row["user_id"] if row else None
+
+        return get_post_by_id(post["id"], user_id, db_cursor)
 
 
 def get_post_title(post_id):
@@ -476,7 +527,7 @@ def get_unapproved_posts():
         db_cursor.execute(
             """
             SELECT
-                p.id, p.title, p.content, p.approved,
+                p.id, p.title, p.content, p.status,
                 p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
@@ -486,9 +537,9 @@ def get_unapproved_posts():
             FROM Posts p
             JOIN Users u ON p.user_id = u.id
             JOIN Categories c ON p.category_id = c.id
-            WHERE p.approved = 0
+            WHERE p.status = 'submitted'
               AND u.active = 1
-            ORDER BY date(p.publication_date) DESC
+            ORDER BY p.submitted_at DESC
             """
         )
 
@@ -503,31 +554,107 @@ def get_unapproved_posts():
         return json.dumps(posts)
 
 
-def approve_post(post_id, approved=True):
-    """Sets the approval status of the specified post"""
+def submit_post(post_id):
+    """Submits a post for review"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
         db_cursor.execute(
-            "UPDATE POSTS SET approved = ?, updated_at = ? WHERE id = ?",
+            """
+            UPDATE Posts 
+            SET status = ?, submitted_at = ?, updated_at = ? 
+            WHERE id = ?
+            """,
             (
-                1 if approved else 0,
+                "submitted",
+                datetime.now(),
                 datetime.now(),
                 post_id,
             ),
         )
 
-        db_cursor.execute("SELECT * FROM Posts WHERE id = ?", (post_id,))
-        row = db_cursor.fetchone()
-        if row is None:
-            return json.dumps({})
+        db_cursor.execute(
+            """
+            SELECT user_id FROM Posts
+            WHERE id = ?     
+            """,
+            (post_id,),
+        )
 
-        approved_post = get_post_by_id(post_id, db_cursor)
+        row = dict(db_cursor.fetchone())
+        user_id = row["user_id"]
 
-        if "image" in approved_post:
-            del approved_post["image"]
+        return get_post_by_id(post_id, user_id, db_cursor)
 
-        return approved_post
+
+def approve_post(post_id, reviewer_id):
+    """Approves a post for publication"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+        db_cursor.execute(
+            """
+            UPDATE Posts 
+            SET status = ?, publication_date = ?, reviewed_at = ?, reviewer_id = ?, updated_at = ? 
+            WHERE id = ?
+            """,
+            (
+                "approved",
+                datetime.now(),
+                datetime.now(),
+                reviewer_id,
+                datetime.now(),
+                post_id,
+            ),
+        )
+
+        db_cursor.execute(
+            """
+            SELECT user_id FROM Posts
+            WHERE id = ?
+            """,
+            (post_id,),
+        )
+
+        row = dict(db_cursor.fetchone())
+        user_id = row["user_id"]
+
+        return get_post_by_id(post_id, user_id, db_cursor)
+
+
+def reject_post(post_id, reviewer_id, admin_comments=None):
+    """Rejects a post and kicks it back for edits"""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+        db_cursor.execute(
+            """
+            UPDATE Posts 
+            SET status = ?, reviewed_at = ?, reviewer_id = ?, admin_comments = ?, updated_at = ? 
+            WHERE id = ?
+            """,
+            (
+                "rejected",
+                datetime.now(),
+                reviewer_id,
+                admin_comments,
+                datetime.now(),
+                post_id,
+            ),
+        )
+
+        db_cursor.execute(
+            """
+            SELECT user_id FROM Posts
+            WHERE id = ?
+            """,
+            (post_id,),
+        )
+
+        row = dict(db_cursor.fetchone())
+        user_id = row["user_id"]
+
+        return get_post_by_id(post_id, user_id, db_cursor)
 
 
 def get_posts_by_tag_id(tag_id):
@@ -539,7 +666,7 @@ def get_posts_by_tag_id(tag_id):
         db_cursor.execute(
             """
             SELECT
-                p.id, p.title, p.content, p.approved,
+                p.id, p.title, p.content, p.status,
                 p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
@@ -550,7 +677,7 @@ def get_posts_by_tag_id(tag_id):
             JOIN Users u ON p.user_id = u.id
             JOIN Categories c ON p.category_id = c.id
             JOIN PostTags pt ON pt.post_id = p.id
-            WHERE p.approved = 1
+            WHERE p.status = 'approved'
               AND date(p.publication_date) <= date('now')
               AND pt.tag_id = ?
             ORDER BY date(p.publication_date) DESC
@@ -579,7 +706,7 @@ def search_posts_by_title(search_term):
         db_cursor.execute(
             """
             SELECT
-            p.id, p.title, p.content, p.approved,
+            p.id, p.title, p.content, p.status,
             p.publication_date, p.updated_at,
             json_object(
                 'id', u.id, 'first_name', u.first_name,
@@ -592,7 +719,7 @@ def search_posts_by_title(search_term):
             JOIN Categories c
             ON c.id = p.category_id
             WHERE p.title LIKE ?
-            AND p.approved = 1
+            AND p.status = 'approved'
             ORDER BY p.publication_date DESC
             """,
             (f"%{search_term}%",),
@@ -632,7 +759,8 @@ def add_reaction(post_id, user_id, reaction_id):
             (user_id, reaction_id, post_id),
         )
         return json.dumps({"id": db_cursor.lastrowid})
-    
+
+
 def remove_reaction(post_reaction_id):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
@@ -641,7 +769,8 @@ def remove_reaction(post_reaction_id):
             """
             DELETE FROM PostReactions
             WHERE id = ?
-            """, (post_reaction_id,)
+            """,
+            (post_reaction_id,),
         )
 
         return json.dumps({"deleted": True})
@@ -688,7 +817,7 @@ def get_subscribed_posts(user_id):
         db_cursor.execute(
             f"""
             SELECT
-                p.id, p.title, p.content, p.approved,
+                p.id, p.title, p.content, p.status,
                 p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
@@ -699,7 +828,7 @@ def get_subscribed_posts(user_id):
             JOIN Users u ON p.user_id = u.id
             JOIN Categories c ON p.category_id = c.id
             WHERE p.user_id IN ({placeholders})
-            AND p.approved = 1
+            AND p.status = 'approved'
             ORDER BY date(p.publication_date) DESC
             """,
             subscribed_users,
@@ -734,7 +863,7 @@ def get_posts_by_category_id(category_id):
         db_cursor.execute(
             """
             SELECT
-                p.id, p.title, p.content, p.approved,
+                p.id, p.title, p.content, p.status,
                 p.publication_date, p.updated_at,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
@@ -744,7 +873,7 @@ def get_posts_by_category_id(category_id):
             FROM Posts p
             JOIN Users u ON p.user_id = u.id
             JOIN Categories c ON p.category_id = c.id
-            WHERE p.approved = 1
+            WHERE p.status = 'approved'
               AND date(p.publication_date) <= date('now')
               AND c.id = ?
             ORDER BY date(p.publication_date) DESC
