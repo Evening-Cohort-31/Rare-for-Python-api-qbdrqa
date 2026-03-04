@@ -77,7 +77,7 @@ CREATE TABLE "Comments" (
 CREATE TABLE "Reactions" (
   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
   "label" varchar,
-  "image_url" varchar
+  "emoji" varchar UNIQUE
 );
 
 -- Create PostReactions table
@@ -87,8 +87,9 @@ CREATE TABLE "PostReactions" (
   "reaction_id" INTEGER,
   "post_id" INTEGER,
   FOREIGN KEY(`user_id`) REFERENCES `Users`(`id`),
-  FOREIGN KEY(`reaction_id`) REFERENCES `Reactions`(`id`),
-  FOREIGN KEY(`post_id`) REFERENCES `Posts`(`id`)
+  FOREIGN KEY(`reaction_id`) REFERENCES `Reactions`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY(`post_id`) REFERENCES `Posts`(`id`),
+  UNIQUE(user_id, reaction_id, post_id)
 );
 
 -- Create Tags table
@@ -364,10 +365,38 @@ SET updated_at = created_on
 WHERE updated_at IS NULL;
 
 UPDATE Posts
-SET updated_at = publication_date
+SET updated_at = publication_date;
 
-WHERE updated_at IS NULL
+WHERE updated_at IS NULL;
+
+ALTER TABLE Reactions
+RENAME COLUMN image_url TO emoji;
+
+
+  const reactionEmojis = {
+    "happy": "",
+    "heart": "",
+    "laugh": "",
+    "mind-blown": "",
+    "fire": "",
+    "thumbs-up": "",
+    "celebrate": ""
+  }
+
+
+CREATE UNIQUE INDEX idx_unique_user_reaction_post 
+ON PostReactions(user_id, reaction_id, post_id);
 
 UPDATE Users
 SET type = 'admin'
 WHERE id = 16
+
+-- Seed Reactions
+INSERT INTO Reactions ('label', 'emoji') VALUES 
+('happy', '😊'),
+('heart', '❤️'),
+('laugh', '😂'),
+('mind-blown', '🤯'),
+('fire', '🔥'),
+('thumbs-up', '👍'),
+('celebrate', '🎉');

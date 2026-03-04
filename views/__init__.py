@@ -25,7 +25,9 @@ from .post import (
     search_posts_by_title,
     get_post_header_image,
     get_posts_by_category_id,
-    get_post_title
+    get_post_title,
+    get_reactions,
+    remove_reaction,
 )
 
 from .tag import (
@@ -43,4 +45,10 @@ from .user import (
     delete_subscription,
     add_subscription,
     get_user_profile_image,
+)
+
+from .reaction import (
+    create_reaction,
+    update_reaction,
+    delete_reaction
 )

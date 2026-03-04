@@ -27,6 +27,8 @@ from views.post import (
     get_subscribed_posts,
     get_post_header_image,
     get_posts_by_category_id,
+    get_reactions,
+    remove_reaction,
 )
 
 from views.user import (
@@ -47,6 +49,8 @@ from views.category import (
     delete_category,
 )
 from views.tag import get_tags, get_tag_by_id, create_tag
+
+from views.reaction import create_reaction, update_reaction, delete_reaction
 
 
 class JSONServer(HandleRequests):
@@ -202,6 +206,14 @@ class JSONServer(HandleRequests):
                 response_body = get_comments_by_post_id(post_id)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
             return self.response("[]", status.HTTP_200_SUCCESS.value)
+        
+        if url["requested_resource"] == "reactions":
+            if url["pk"] != 0:
+                pass
+            else:
+                response_body = get_reactions()
+                return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
         return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
     def do_DELETE(self):
@@ -228,6 +240,12 @@ class JSONServer(HandleRequests):
 
         if url["requested_resource"] == "comments" and url["pk"] != 0:
             response_body = delete_comment(url["pk"])
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
+        if url["requested_resource"] == "post_reaction" and url["pk"] != 0:
+            response_body = remove_reaction(url["pk"])
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
+        if url["requested_resource"] == "reactions" and url["pk"] != 0:
+            response_body = delete_reaction(url["pk"])
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
         return self.response(
             "Not found", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value
@@ -289,6 +307,16 @@ class JSONServer(HandleRequests):
                     return self.response(
                         response_body, status.HTTP_201_SUCCESS_CREATED.value
                     )
+                
+        if url["requested_resource"] == "reactions":
+            if url["pk"] != 0:
+                pass
+            else:
+                response_body = create_reaction(request_body)
+                json_body = json.loads(response_body)
+                if json_body.get("ok") is False:
+                    return self.response(response_body, status.HTTP_409_CONFLICT.value)
+                return self.response(response_body, status.HTTP_201_SUCCESS_CREATED.value)
 
         return self.response("", status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value)
 
@@ -327,6 +355,9 @@ class JSONServer(HandleRequests):
         if url["requested_resource"] == "users":
             if pk != 0:
                 response_body = update_user(request_body)
+                json_body = json.loads(response_body)
+                if json_body.get("ok") is False:
+                    return self.response(response_body, status.HTTP_409_CONFLICT.value)
                 return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
         if url["requested_resource"] == "comments" and pk != 0:
@@ -336,6 +367,14 @@ class JSONServer(HandleRequests):
         if url["requested_resource"] == "categories" and pk != 0:
             response_body = update_category(pk, request_body)
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
+        
+        if url["requested_resource"] == "reactions" and pk != 0:
+            response_body = update_reaction(request_body)
+            json_body = json.loads(response_body)
+            if json_body.get("ok") is False:
+                return self.response(response_body, status.HTTP_409_CONFLICT.value)
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
 
         return self.response(
             "Requested resource not found",
