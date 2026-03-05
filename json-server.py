@@ -1,5 +1,5 @@
 import json
-import imghdr
+import filetype
 
 from http.server import ThreadingHTTPServer
 from nss_handler import HandleRequests, status
@@ -88,11 +88,8 @@ class JSONServer(HandleRequests):
                 image_data = get_user_profile_image(user_id)
                 if image_data:
                     try:
-                        # Detect actual image type
-                        image_type = imghdr.what(None, h=image_data)
-                        content_type = (
-                            f"image/{image_type}" if image_type else "image/jpeg"
-                        )
+                        kind = filetype.guess(image_data)
+                        content_type = kind.mime if kind else "image/jpeg"
 
                         self.send_response(200)
                         self.send_header("Content-Type", content_type)
@@ -121,7 +118,7 @@ class JSONServer(HandleRequests):
                 ):
                     response_body = get_subscribed_posts(url["pk"])
                     return self.response(response_body, status.HTTP_200_SUCCESS.value)
-                
+
                 # Get user_id from query params (user requesting the post)
                 if "user_id" in query_params:
                     user_id = query_params.get("user_id", [None])[0]
@@ -166,11 +163,8 @@ class JSONServer(HandleRequests):
                 image_data = get_post_header_image(post_id)
                 if image_data:
                     try:
-                        # Detect actual image type
-                        image_type = imghdr.what(None, h=image_data)
-                        content_type = (
-                            f"image/{image_type}" if image_type else "image/jpeg"
-                        )
+                        kind = filetype.guess(image_data)
+                        content_type = kind.mime if kind else "image/jpeg"
 
                         self.send_response(200)
                         self.send_header("Content-Type", content_type)
