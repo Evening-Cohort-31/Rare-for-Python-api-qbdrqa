@@ -124,6 +124,21 @@ CREATE TABLE "Posts" (
   FOREIGN KEY(`reviewer_id`) REFERENCES `Users`(`id`)
 );
 
+
+CREATE TRIGGER posts_add_publication_date_on_approved
+AFTER UPDATE OF status ON Posts
+WHEN OLD.status IS NOT NEW.status AND NEW.status = 'approved'
+BEGIN
+  UPDATE Posts SET publication_date = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER posts_reset_publication_date_on_depublish
+AFTER UPDATE OF status ON Posts
+WHEN OLD.status IS NOT NEW.status AND NEW.status != 'approved'
+BEGIN
+  UPDATE POSTS SET publication_date = NULL WHERE id = NEW.id;
+END;
+
 CREATE TABLE "Comments" (
   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
   "post_id" INTEGER,
