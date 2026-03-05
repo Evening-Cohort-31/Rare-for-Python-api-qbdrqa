@@ -239,6 +239,7 @@ def get_all_posts():
             SELECT
                 p.id, p.title, p.content, p.status,
                 p.publication_date, p.updated_at,
+                p.admin_comments,
                 json_object(
                     'id', u.id, 'first_name', u.first_name,
                     'last_name', u.last_name, 'username', u.username
@@ -278,6 +279,7 @@ def get_user_posts(user_id, own_posts=False):
                 SELECT
                     p.id, p.title, p.content, p.status,
                     p.publication_date, p.updated_at,
+                    p.admin_comments,
                     json_object(
                         'id', u.id, 'first_name', u.first_name,
                         'last_name', u.last_name, 'username', u.username
@@ -300,6 +302,7 @@ def get_user_posts(user_id, own_posts=False):
                 SELECT
                     p.id, p.title, p.content, p.status,
                     p.publication_date, p.updated_at,
+                    p.admin_comments,
                     json_object(
                         'id', u.id, 'first_name', u.first_name,
                         'last_name', u.last_name, 'username', u.username
@@ -332,6 +335,7 @@ def get_post_by_id(post_id, user_id, cursor=None):
     SELECT
         p.id, p.title, p.content, p.status, p.user_id,
         p.publication_date, p.updated_at,
+        p.admin_comments,
         json_object(
             'id', u.id, 'first_name', u.first_name,
             'last_name', u.last_name, 'username', u.username
@@ -398,6 +402,8 @@ def get_post_details(post_id):
                 p.content,
                 p.publication_date,
                 p.updated_at,
+                p.admin_comments,
+                p.status,
                 u.first_name || ' ' || u.last_name AS author_display_name
             FROM Posts p
             JOIN Users u ON u.id = p.user_id
