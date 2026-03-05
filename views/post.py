@@ -437,12 +437,39 @@ def update_post(post):
         has_new_image = "image" in post and post["image"]
         blob_data = None
 
+        # Check if status is being updated and is not "approved"
+        update_status = "status" in post and post["status"] != "approved"
+
         if has_new_image:
             if isinstance(post["image"], bytes):
                 blob_data = post["image"]
 
-        # Build UPDATE query conditionally based on whether image is provided
-        if has_new_image:
+        # Build UPDATE query conditionally based on whether image and/or status is provided
+        if has_new_image and update_status:
+            db_cursor.execute(
+                """
+                UPDATE Posts
+                SET 
+                    category_id = ?,
+                    title = ?,
+                    content = ?,
+                    image = ?,
+                    status = ?,
+                    publication_date = NULL,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    category_id,
+                    post["title"],
+                    post["content"],
+                    blob_data,
+                    post["status"],
+                    datetime.now(),
+                    post["id"],
+                ),
+            )
+        elif has_new_image:
             db_cursor.execute(
                 """
                 UPDATE Posts
@@ -463,8 +490,30 @@ def update_post(post):
                     post["id"],
                 ),
             )
+        elif update_status:
+            db_cursor.execute(
+                """
+                UPDATE Posts
+                SET 
+                    category_id = ?,
+                    title = ?,
+                    content = ?,
+                    status = ?,
+                    publication_date = NULL,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    category_id,
+                    post["title"],
+                    post["content"],
+                    post["status"],
+                    datetime.now(),
+                    post["id"],
+                ),
+            )
         else:
-            # Don't update image field if no new image provided
+            # Don't update image, status, or publication_date
             db_cursor.execute(
                 """
                 UPDATE Posts
@@ -564,7 +613,8 @@ def submit_post(post_id):
             """
             SELECT user_id FROM Posts p
             WHERE p.id = ?
-            """, (post_id,)
+            """,
+            (post_id,),
         )
 
         row = dict(db_cursor.fetchone())
@@ -593,12 +643,12 @@ def submit_post(post_id):
         return get_post_by_id(post_id, user_id, db_cursor)
 
 
-def approve_post(post_id, reviewer_id, cursor = None):
+def approve_post(post_id, reviewer_id, cursor=None):
     """Approves a post for publication"""
 
     if cursor:
         db_cursor = cursor
-    
+
     else:
         with sqlite3.connect(DB_PATH) as conn:
             conn.row_factory = sqlite3.Row
