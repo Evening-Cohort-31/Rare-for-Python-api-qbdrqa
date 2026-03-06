@@ -78,13 +78,6 @@ BEGIN
   SELECT RAISE(ABORT, 'Must activate user before promoting to admin');
 END;
 
-CREATE TRIGGER users_block_duplicate_password
-BEFORE UPDATE OF password ON Users
-WHEN OLD.password = NEW.password
-BEGIN
-    SELECT RAISE(ABORT, 'Cannot use same password');
-END;
-
 CREATE TABLE "DemotionQueue" (
   "action" varchar,
   "admin_id" INTEGER,
@@ -184,7 +177,7 @@ CREATE TABLE "PostTags" (
 
 CREATE TABLE "Categories" (
   "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "label" varchar
+  "label" varchar UNIQUE
 );
 
 -- ====================================
