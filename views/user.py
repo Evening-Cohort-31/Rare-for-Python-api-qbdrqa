@@ -495,6 +495,25 @@ def get_user_profile_image(user_id):
         return result[0] if result and result[0] else None
 
 
+def check_if_admin(user_id, cursor):
+    cursor.execute(
+        """
+        SELECT type FROM Users u
+        WHERE u.id = ?
+        """,
+        (user_id,),
+    )
+
+    row = cursor.fetchone()
+
+    if row is None:
+        return False
+
+    is_admin = row["type"] == "admin"
+
+    return is_admin
+
+
 def __handle_demotion__(action, user_id, approver_id, db_cursor):
     try:
         if not action:

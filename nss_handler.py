@@ -1,8 +1,7 @@
 from enum import Enum
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler
-import io
-import cgi
+import email
 
 
 class status(Enum):
@@ -62,28 +61,20 @@ class HandleRequests(BaseHTTPRequestHandler):
         content_type = self.headers["content-type"]
         content_length = int(self.headers["content-length"])
 
-        # Read body
         body = self.rfile.read(content_length)
 
-        # Create environment for cgi.FieldStorage
-        environ = {
-            "REQUEST_METHOD": "POST",
-            "CONTENT_TYPE": content_type,
-            "CONTENT_LENGTH": str(content_length),
-        }
-
-        # Parse the form data
-        form = cgi.FieldStorage(
-            fp=io.BytesIO(body), environ=environ, keep_blank_values=True
+        # Prepend the Content-Type header so email can parse the multipart body
+        msg = email.message_from_bytes(
+            f"Content-Type: {content_type}\r\n\r\n".encode() + body
         )
 
-        # Extract fields into a dictionary
         parsed_data = {}
-        for key in form.keys():
-            field = form[key]
-            if field.filename:  # It's a file
-                parsed_data[key] = field.file.read()  # Binary data
-            else:
-                parsed_data[key] = field.value  # Text data
+        for part in msg.get_payload():
+            name = part.get_param("name", header="content-disposition")
+            filename = part.get_filename()
+            if filename:  # It's a file — return binary data
+                parsed_data[name] = part.get_payload(decode=True)
+            else:  # Text field
+                parsed_data[name] = part.get_payload(decode=True).decode("utf-8")
 
         return parsed_data
