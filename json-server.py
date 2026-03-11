@@ -50,7 +50,13 @@ from views.category import (
     update_category,
     delete_category,
 )
-from views.tag import get_tags, get_tag_by_id, create_tag
+from views.tag import (
+    get_tags,
+    get_tag_by_id,
+    create_tag,
+    update_tag,
+    delete_tag,
+)
 
 from views.reaction import create_reaction, update_reaction, delete_reaction
 
@@ -246,9 +252,21 @@ class JSONServer(HandleRequests):
         if url["requested_resource"] == "comments" and url["pk"] != 0:
             response_body = delete_comment(url["pk"])
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
+        if url["requested_resource"] == "tags" and url["pk"] != 0:
+            successfully_deleted = delete_tag(url["pk"])
+            if successfully_deleted:
+                return self.response("", status.HTTP_204_SUCCESS_NO_RESPONSE_BODY.value)
+
+            return self.response(
+                "Requested resource not found",
+                status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value,
+            )
+
         if url["requested_resource"] == "post_reaction" and url["pk"] != 0:
             response_body = remove_reaction(url["pk"])
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
         if url["requested_resource"] == "reactions" and url["pk"] != 0:
             response_body = delete_reaction(url["pk"])
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
@@ -403,6 +421,10 @@ class JSONServer(HandleRequests):
 
         if url["requested_resource"] == "categories" and pk != 0:
             response_body = update_category(pk, request_body)
+            return self.response(response_body, status.HTTP_200_SUCCESS.value)
+
+        if url["requested_resource"] == "tags" and pk != 0:
+            response_body = update_tag(pk, request_body)
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
         if url["requested_resource"] == "reactions" and pk != 0:

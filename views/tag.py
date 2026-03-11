@@ -75,3 +75,45 @@ def create_tag(tag):
         new_tag = db_cursor.fetchone()
 
         return json.dumps(dict(new_tag)) if new_tag else json.dumps({})
+
+
+def update_tag(tag_id, tag):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            UPDATE Tags
+            SET label = ?
+            WHERE id = ?
+        """,
+            (tag["label"], tag_id),
+        )
+
+        db_cursor.execute(
+            """
+            SELECT id, label
+            FROM Tags
+            WHERE id = ?
+        """,
+            (tag_id,),
+        )
+
+        row = db_cursor.fetchone()
+        return json.dumps(dict(row)) if row else json.dumps({})
+
+
+def delete_tag(tag_id):
+    with sqlite3.connect(DB_PATH) as conn:
+        db_cursor = conn.cursor()
+
+        db_cursor.execute(
+            """
+            DELETE FROM Tags
+            WHERE id = ?
+        """,
+            (tag_id,),
+        )
+
+        return db_cursor.rowcount > 0
