@@ -224,6 +224,8 @@ def create_post(post):
                     tag_ids = json.loads(tag_ids)
                 except json.JSONDecodeError:
                     tag_ids = [t.strip() for t in tag_ids.split(",") if t.strip()]
+            if not isinstance(tag_ids, list):
+                tag_ids = [tag_ids]
             if tag_ids and isinstance(tag_ids[0], dict):
                 tag_ids = [t["id"] for t in tag_ids]
             tag_ids = [int(t) for t in tag_ids]
