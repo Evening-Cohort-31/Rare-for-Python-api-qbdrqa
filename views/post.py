@@ -177,6 +177,9 @@ def create_post(post):
         conn.row_factory = sqlite3.Row
         db_cursor = conn.cursor()
 
+        is_admin = check_if_admin(post["user_id"], db_cursor)
+        is_draft = post.get("status", "draft") == "draft"
+
         blob_data = None
         if "image" in post and post["image"]:
             # Check if it's already binary data (from formData) or a file path
@@ -207,10 +210,10 @@ def create_post(post):
                 post["user_id"],
                 post["category_id"],
                 post["title"],
-                None,  # publication_date set when approved
+                None if not is_admin else datetime.now(),  # publication_date set when approved
                 blob_data,
                 post["content"],
-                post.get("status", "draft"),  # default to 'draft'
+                "draft" if is_draft else ("approved" if is_admin else "submitted"),
                 datetime.now(),
             ),
         )
