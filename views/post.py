@@ -220,7 +220,10 @@ def create_post(post):
         if "tags" in post:
             tag_ids = post["tags"]
             if isinstance(tag_ids, str):
-                tag_ids = json.loads(tag_ids)
+                try:
+                    tag_ids = json.loads(tag_ids)
+                except json.JSONDecodeError:
+                    tag_ids = [t.strip() for t in tag_ids.split(",") if t.strip()]
             if tag_ids and isinstance(tag_ids[0], dict):
                 tag_ids = [t["id"] for t in tag_ids]
             tag_ids = [int(t) for t in tag_ids]
