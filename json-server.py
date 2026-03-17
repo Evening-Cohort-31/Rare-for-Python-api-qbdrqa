@@ -254,14 +254,8 @@ class JSONServer(HandleRequests):
             return self.response(response_body, status.HTTP_200_SUCCESS.value)
 
         if url["requested_resource"] == "tags" and url["pk"] != 0:
-            successfully_deleted = delete_tag(url["pk"])
-            if successfully_deleted:
-                return self.response("", status.HTTP_204_SUCCESS_NO_RESPONSE_BODY.value)
-
-            return self.response(
-                "Requested resource not found",
-                status.HTTP_404_CLIENT_ERROR_RESOURCE_NOT_FOUND.value,
-            )
+            response_body = delete_tag(url["pk"])
+            return self.response(response_body, status.HTTP_204_SUCCESS_NO_RESPONSE_BODY.value)
 
         if url["requested_resource"] == "post_reaction" and url["pk"] != 0:
             response_body = remove_reaction(url["pk"])

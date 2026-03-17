@@ -116,4 +116,4 @@ def delete_tag(tag_id):
             (tag_id,),
         )
 
-        return db_cursor.rowcount > 0
+        return json.dumps({"deleted": db_cursor.rowcount > 0})
